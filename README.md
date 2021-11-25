@@ -67,85 +67,91 @@ which imports the igm class, creates an element of the igm class, and runs it wi
 # A simple usage with higher control
 
 Alertantively, you may run *python igm-run.py*, where the file *igm-run.py* contains:
-
-        from igm import igm 
-        igm = igm() 
-        igm.run()
-
+```python
+from igm import igm 
+igm = igm() 
+igm.run()
+```
 or equivalently (this long version provides explicitly all steps of the glacier evolution model, Fig.1):
+```python
+import tensorflow as tf
+from igm import igm
+igm = igm()
 
-        import tensorflow as tf
-        from igm import igm
-        igm = igm()
-
-        igm.initialize()  
-        with tf.device(igm.device_name):
-            igm.load_ncdf_data(igm.config.geology_file)
-            igm.initialize_fields()               
-            igm.initialize_iceflow()
-            igm.update_climate()
-            igm.update_smb()
-            igm.update_iceflow()                    
-            igm.update_ncdf_ex()
-            igm.update_ncdf_ts()
-            igm.print_info()
-            while igm.t < igm.config.tend:                       
-                igm.update_climate()
-                igm.update_smb()
-                igm.update_iceflow()
-                igm.update_t_dt() 
-                igm.update_thk()       
-                igm.update_ncdf_ex()
-                igm.update_ncdf_ts()
-                igm.update_plot()
-                igm.print_info()
+igm.initialize()  
+with tf.device(igm.device_name):
+    igm.load_ncdf_data(igm.config.geology_file)
+    igm.initialize_fields()               
+    igm.initialize_iceflow()
+    igm.update_climate()
+    igm.update_smb()
+    igm.update_iceflow()                    
+    igm.update_ncdf_ex()
+    igm.update_ncdf_ts()
+    igm.print_info()
+    while igm.t < igm.config.tend:                       
+	igm.update_climate()
+	igm.update_smb()
+	igm.update_iceflow()
+	igm.update_t_dt() 
+	igm.update_thk()       
+	igm.update_ncdf_ex()
+	igm.update_ncdf_ts()
+	igm.update_plot()
+	igm.print_info()
+```
 
 By doing so, one can easily access any igm variables (see the list of variables below) on the fly, e.g., one can plot the ice thickness with the following command:
+```python
+import matplotlib.pyplot as plt
+plt.imshow(igm.thk,origin='lower') ; plt.colorbar()
+```
 
-	import matplotlib.pyplot as plt
-	plt.imshow(igm.thk,origin='lower') ; plt.colorbar()
-	
 You can also bring own modifications in the loop, e.g., the following line imposes zero mass balance above 4000 m asl. 
+```python
+igm.smb.assign( tf.where(igm.usurf > 4000, 0, igm.smb) )
+```
 
-	igm.smb.assign( tf.where(igm.usurf > 4000, 0, igm.smb) )
-	
 # TensorFlow
 
 Note that IGM heavily relies on [TensorFlow 2.0](https://www.tensorflow.org/), and most of the relevant glaciological variables (e.g. ice thickness) are TensorFlow tensor objects, which then can be only modified using TensorFlow operations. At first sight, TensorFlow functions may look similar to Numpy, however, the operations between TensorFlow Tensors are in general not as flexible as for Numpy. For the best computational efficiency on GPU, it is crucial to keep all variables and operations within the TensorFlow framework without using numpy (to avoid unnecessary transfers between GPU and CPU memory). For quick testing and if you are unfamiliar with TensorFlow, you can always switch between TensorFlow and numpy objects as follows:
- 
-	import numpy as np
-	thk_np = igm.thk.numpy()  # tensorflow to numpy
-	# here you can do numpy operations on thk_np is you wish
-	thk.assign( thk_np )      # numpy to tensorflow
+ ```python
+import numpy as np
+thk_np = igm.thk.numpy()  # tensorflow to numpy
+# here you can do numpy operations on thk_np is you wish
+thk.assign( thk_np )      # numpy to tensorflow
+```
 
 # Advanced usage
 
 For more advanced usage with custumized model components, you may add your own routine by building a new class igm that inherits from igm to keep cores functions as follows:
-
-	from igm import igm 
-	class igm(igm):
-	    def update_my_field(self):
-	          self.myfield.assign( ... )
+```python
+from igm import igm 
+class igm(igm):
+    def update_my_field(self):
+	  self.myfield.assign( ... )
+```
 
 and then include 'igm.update_my_field()' in the time loop above (e.g. between 'igm.update_smb()' and 'igm.update_iceflow()'). In that case you can no longer use the shortcut 'igm.run()'. For custumized mass balance or climate update function, you may do that without modifying the main loop (i.e. keeping 'igm.run()') by defining you own routine named update_smb_mysmb and making sure to activate it by setting the parameter igm.config.type_mass_balance = 'mysmb'. For instance, an implementation of the mass balance function 'sinus' with an oscillating ELA looks like
+```python
+import tensorflow as tf
+import math
+from igm import igm 
 
-	import tensorflow as tf
-	import math
-	from igm import igm 
+class igm(igm):
 
-	class igm(igm):
+    def update_smb_sinus(self):
+	ela = 2800 + 500*math.sin((self.t/50)*math.pi)  # define ELA
+	smb = self.usurf - ela
+	smb *= tf.where( smb < 0, 0.005, 0.009)  # multiply with ablat. and accum. gradients
+	smb = tf.clip_by_value(smb, -100, 2.0)   # clip accumulation to 2 m/y
+	self.smb.assign( smb )
 
-	    def update_smb_sinus(self):
-		ela = 2800 + 500*math.sin((self.t/50)*math.pi)  # define ELA
-		smb = self.usurf - ela
-		smb *= tf.where( smb < 0, 0.005, 0.009)  # multiply with ablat. and accum. gradients
-		smb = tf.clip_by_value(smb, -100, 2.0)   # clip accumulation to 2 m/y
-		self.smb.assign( smb )
+igm = igm()
+igm.config.type_mass_balance = 'sinus' # do not forget to select the mass balance routine in use
+igm.run()
+```
 
-	igm = igm()
-	igm.config.type_mass_balance = 'sinus' # do not forget to select the mass balance routine in use
-	igm.run()
- 
 # Variable names
 
 Whenever this is possible, IGM adopts the convention name of [PISM](https://pism-docs.org). Here is a minimal list of key variables:
