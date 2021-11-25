@@ -201,7 +201,7 @@ The structure of IGM facilitates the embeding of further emulators beyond the ic
 
 # Data assimilation / Invert modelling
 
-A data assimilation module of IGM to seek for optimal ice thickness, top ice surface, and ice flow parametrization, that best explain observational data while being consistent with the ice flow emulator is currently under in preparation.
+A data assimilation module of IGM to seek for optimal ice thickness, top ice surface, and ice flow parametrization, that best explain observational data while being consistent with the ice flow emulator is currently in preparation.
 
 # CPUs, GPUs, and IGM capabilities
 
