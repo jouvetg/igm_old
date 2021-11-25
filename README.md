@@ -222,7 +222,7 @@ I greatly thank [Guillaume Cordonnier](https://www-sop.inria.fr/members/Guillaum
 
 # IGM related PhD and Master project offers
 
-I'm currently looking for a PhD student to work with IGM at [reconstructing paleo climate using invert glacier model and deep learning](https://career012.successfactors.eu/career?career%5fns=job%5flisting&company=universitdP&navBarLevel=JOB%5fSEARCH&rcm%5fsite%5flocale=en%5fUS&career_job_req_id=18564&selected_lang=en_US&jobAlertController_jobAlertId=&jobAlertController_jobAlertName=&browserTimeZone=Europe/Zurich&_s.crb=mnvAetVZ8lLAT15eNSLmJABWuEdCyhqo4zhua52ug98%3d). I also do have available topics to work on IGM for Master projects (at University of Zurich or Lausanne). Just contact me if you are interested.
+I'm currently looking for a PhD student to work with IGM at [reconstructing paleo climate using invert glacier model and deep learning](https://career012.successfactors.eu/career?career%5fns=job%5flisting&company=universitdP&navBarLevel=JOB%5fSEARCH&rcm%5fsite%5flocale=en%5fUS&career_job_req_id=18564&selected_lang=en_US&jobAlertController_jobAlertId=&jobAlertController_jobAlertName=&browserTimeZone=Europe/Zurich&_s.crb=mnvAetVZ8lLAT15eNSLmJABWuEdCyhqo4zhua52ug98%3d).
 
 # Contact
 
