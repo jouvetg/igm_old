@@ -18,10 +18,15 @@ IGM consists of an open-source Python code, which runs across both CPU and GPU a
 # Installing Python Packages
 
 IGM is written in Python and requires the installation of libraries such as numpy, matplotlib, netCDF4, tensorflow (version 2.4.0 or later), and keras libraries. I recommend creating a dedicated Python environment 'igm' typing the following commands (here we use conda):
+ 
+	conda env create -f igm.yml
 
-	conda create --name igm python=3.7
+or you can do step-by-step with
+
+	conda create --name igm python=3.8
 	conda activate igm
 	conda install matplotlib numpy netCDF4 
+	conda install scipy IPython
 	pip install tensorflow==2.4.0   
 	pip install keras
 	pip install tensorflow-addons
@@ -30,7 +35,11 @@ IGM is written in Python and requires the installation of libraries such as nump
 Optional: For the best performance, I recommend running IGM on GPU. For that purpose, you need to additionally install i) cuda ii) cudnn iii) tensorflow-gpu. **Make sure that i) cuda ii) cudnn iii) tensorflow iv) python versions are [compatible](https://www.tensorflow.org/install/source#gpu), and your Nvidia driver is [compatible](https://docs.nvidia.com/deploy/cuda-compatibility/) with the version of cuda. Such incompatibility is the most common source of issue.** Here, an example of installation:
  
 	conda install cudatoolkit=11.0 cudnn=8.0 -c conda-forge 
-	pip install tensorflow-gpu==2.4.0    
+	pip install tensorflow-gpu==2.4.0
+
+You may additionally install spyder, which is a nice matlab-looking free editor:
+
+	conda install spyder
 	
 # Quick start with examples
 
