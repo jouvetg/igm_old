@@ -1,35 +1,23 @@
 #!/usr/bin/env python3
 
 """
-igm.py contains all functions for the IGM model
-@author: Guillaume Jouvet
+Copyright (C) 2021-2022 Guillaume Jouvet <guillaume.jouvet@geo.uzh.ch>
+Published under the GNU GPL (Version 3), check at the LICENSE file
 
-#      INITIALIZATION
-#      I/O NCDF
-#      ICEFLOW
-#      MASS BALANCE
-#      TRANSPORT
-#      PLOT
-#      MISC
+This file contains the core functions the Instructed Glacier Model (IGM),
+functions are sorted by thema, which are
 
-Main variables are (most follow the PISM convention naming variables) :
+#      INITIALIZATION : contains all to initialize variables
+#      I/O NCDF : Files for data Input/Output using NetCDF file format
+#      COMPUTE T AND DT : Function to compute adaptive time-step and time
+#      ICEFLOW : Containt the function that serve compute the emulated iceflow
+#      CLIMATE : Templates for function updating climate
+#      MASS BALANCE : Simple mass balance
+#      TRANSPORT : This handles the mass conservation
+#      PLOT : Plotting functions
+#      PRINT INFO : handle the printing of output during computation
+#      RUN : the main function that wrap all functions within an time-iterative loop
 
-x , y       : vector giving the coordinates of each grid cell
-thk         : ice thickness
-topg        : basal topography (= bedrock, assumed to be non-moving)
-smb         : surface mass balance (accumulation - melting overage over one year)
-ubar        : x depth-average velocity of ice
-vbar        : y depth-average velocity of ice
-velbar_mag  : magnitude of the depth-average velocity of ice
-uvelbase    : x velocity basal
-vvelbase    : y velocity basal 
-velbase_mag : magnitude of the basal velocity of ice
-uvelsurf    : x velocity surface
-vvelsurf    : y velocity surface
-velsurf_mag : magnitude of the surface velocity of ice
-uvelshear   : x velocity shear 
-vvelshear   : y velocity shear 
-velshear_mag : magnitude of the shear velocity (i.e. surf - base)
 """
 
 ####################################################################################
