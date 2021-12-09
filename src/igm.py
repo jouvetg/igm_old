@@ -631,6 +631,12 @@ class igm:
             default=0,
             help="In case the mdel is a unet, it must force window size to be multiple of e.g. 8",
         )
+        self.parser.add_argument(
+            "--force_max_velbar",
+            type=float,
+            default=0,
+            help="This permits to artificially upper-bound velocities, active if > 0",
+        )
 
     def initialize_iceflow(self):
         """
@@ -695,7 +701,24 @@ class igm:
             vars(self)[f].assign(
                 tf.where(self.thk > 0, Y[0, :Ny, :Nx, kk], 0) * self.fieldbounds[f]
             )
-
+         
+        if (self.config.force_max_velbar>0):
+        
+            self.velbar_mag = self.getmag(self.ubar, self.vbar)
+            
+            self.ubar.assign( 
+              tf.where( self.velbar_mag >= self.config.force_max_velbar,
+                        self.config.force_max_velbar * ( self.ubar / self.velbar_mag ),
+                        self.ubar
+                      )
+                            )
+            self.vbar.assign( 
+              tf.where( self.velbar_mag >= self.config.force_max_velbar,
+                        self.config.force_max_velbar * ( self.vbar / self.velbar_mag ),
+                        self.vbar
+                      )
+                            )
+                     
         self.tcomp["Ice flow"][-1] -= time.time()
         self.tcomp["Ice flow"][-1] *= -1
 
