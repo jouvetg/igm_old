@@ -1031,44 +1031,6 @@ class igm:
             self.tcomp["Outputs plot"][-1] -= time.time()
             self.tcomp["Outputs plot"][-1] *= -1
 
-    def anim_from_netcdf(self):
-
-        import xarray as xr
-        from matplotlib import animation
-
-        ds = xr.open_dataset(self.config.working_dir + "/ex.nc", engine="netcdf4")
-
-        tas = ds.thk
-
-        # Get a handle on the figure and the axes
-        fig, ax = plt.subplots(figsize=(8, 10))
-
-        # Plot the initial frame.
-        cax = tas[0, :, :].plot(
-            add_colorbar=True,
-            cmap="coolwarm",
-            vmin=0,
-            vmax=800,
-            cbar_kwargs={"extend": "neither"},
-        )
-
-        ax.axis("off")
-
-        # Next we need to create a function that updates the values for the colormesh, as well as the title.
-        def animate(frame):
-            cax.set_array(tas[frame, :, :].values.flatten())
-            ax.set_title("Time = " + str(tas.coords["time"].values[frame])[:13])
-
-        # Finally, we use the animation module to create the animation.
-        ani = animation.FuncAnimation(
-            fig,  # figure
-            animate,  # name of the function above
-            frames=tas.shape[0],  # Could also be iterable or list
-            interval=500,  # ms between frames
-        )
-
-        ani.save(self.config.working_dir + "/animation.mp4")
-
     def plot_computational_pie(self):
         """
             Plot to the computational time of each model components in a pie
@@ -1090,13 +1052,7 @@ class igm:
                 total.append(np.sum(self.tcomp[key][1:]))
                 name.append(key)
 
-        #       timeall = np.sum(self.tcomp['All'][1:])
-        #       timeall = np.sum( [np.sum(igm.tcomp[k]) for k in igm.tcomp.keys()] )
-
         sumallindiv = np.sum(total)
-
-        # total.append( timeall - sumallindiv )
-        # name.append('others')
 
         fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(aspect="equal"), dpi=200)
         wedges, texts, autotexts = ax.pie(
@@ -1116,29 +1072,6 @@ class igm:
             os.path.join(self.config.working_dir, "PIE-COMPUTATIONAL.png"), pad_inches=0
         )
         plt.close("all")
-
-        # fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(aspect="equal"), dpi=200)
-        # wedges, texts, autotexts = ax.pie(
-        #     total, autopct=make_autopct(total), textprops=dict(color="w")
-        # )
-        # plt.setp(autotexts, size=20, weight="bold")
-        # plt.tight_layout()
-        # plt.savefig(
-        #     os.path.join(self.config.working_dir, "PIE-COMPUTATIONAL_GRAPH.png"),
-        #     pad_inches=0,
-        # )
-        # plt.close("all")
-
-        # fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(aspect="equal"), dpi=200)
-        # ax.legend(wedges, name, title="Model components")
-        # ax.axis("off")
-        # plt.setp(autotexts, size=20, weight="bold")
-        # plt.tight_layout()
-        # plt.savefig(
-        #     os.path.join(self.config.working_dir, "PIE-COMPUTATIONA-LEGEND.png"),
-        #     pad_inches=0,
-        # )
-        # plt.close("all")
 
     ####################################################################################
     ####################################################################################
