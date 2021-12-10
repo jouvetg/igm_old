@@ -32,14 +32,11 @@ from netCDF4 import Dataset
 from scipy.interpolate import interp1d, CubicSpline, RectBivariateSpline, griddata
 import argparse
 from IPython.display import display, clear_output
-
-
+ 
 def str2bool(v):
     return v.lower() in ("true", "1")
 
-
 ####################################################################################
-
 
 class igm:
 
@@ -238,9 +235,7 @@ class igm:
             self.dhdt = tf.Variable(tf.zeros_like(self.thk))
 
         if not hasattr(self, "strflowctrl"):
-            self.strflowctrl = tf.Variable(
-                tf.ones_like(self.thk) * self.config.init_strflowctrl
-            )
+            self.strflowctrl = tf.Variable(tf.ones_like(self.thk) * self.config.init_strflowctrl)
 
         self.X, self.Y = tf.meshgrid(self.x, self.y)
 
@@ -272,10 +267,7 @@ class igm:
         self.var_info["vvelbase"] = ["y basal velocity of ice", "m/y"]
         self.var_info["velbase_mag"] = ["Basal velocity magnitude of ice", "m/y"]
         self.var_info["divflux"] = ["Divergence of the ice flux", "m/y"]
-        self.var_info["strflowctrl"] = [
-            "arrhenius + 10 * slidingco",
-            "MPa$^{-3}$ a$^{-1}$",
-        ]
+        self.var_info["strflowctrl"] = ["arrhenius + 10 * slidingco", "MPa$^{-3}$ a$^{-1}$"]
         self.var_info["arrhenius"] = ["Arrhenius factor", "MPa$^{-3}$ a$^{-1}$"]
         self.var_info["slidingco"] = ["Sliding Coefficient", "km MPa$^{-3}$ a$^{-1}$"]
         self.var_info["meantemp"] = ["Mean anual surface temperatures", "°C"]
@@ -336,7 +328,14 @@ class igm:
         self.parser.add_argument(
             "--vars_to_save",
             type=list,
-            default=["topg", "usurf", "thk", "smb", "velbar_mag", "velsurf_mag",],
+            default=[
+                "topg",
+                "usurf",
+                "thk",
+                "smb",
+                "velbar_mag",
+                "velsurf_mag",
+            ],
             help="List of variables to be recorded in the ncdef file",
         )
 
@@ -429,7 +428,7 @@ class igm:
 
             self.tcomp["Outputs ncdf"][-1] -= time.time()
             self.tcomp["Outputs ncdf"][-1] *= -1
-
+            
     def update_ncdf_ts(self, force=False):
         """
             Initialize  and write the ncdf time serie file
@@ -439,9 +438,9 @@ class igm:
             self.already_called_update_ncdf_ts = True
 
         if force | self.saveresult:
-
-            vol = np.sum(self.thk) * (self.dx ** 2) / 10 ** 9
-            area = np.sum(self.thk > 1) * (self.dx ** 2) / 10 ** 6
+             
+            vol  = np.sum(self.thk)   * (self.dx ** 2) / 10 ** 9
+            area = np.sum(self.thk>1) * (self.dx ** 2) / 10 ** 6
 
             if self.it == 0:
 
@@ -461,8 +460,8 @@ class igm:
                 E.axis = "T"
                 E[0] = self.t.numpy()
 
-                for var in ["vol", "area"]:
-                    E = nc.createVariable(var, np.dtype("float32").char, ("time"))
+                for var in ['vol','area']:
+                    E = nc.createVariable( var, np.dtype("float32").char, ("time") )
                     E[0] = vars()[var].numpy()
                     E.long_name = self.var_info[var][0]
                     E.units = self.var_info[var][1]
@@ -470,15 +469,11 @@ class igm:
 
             else:
 
-                nc = Dataset(
-                    os.path.join(self.config.working_dir, "ts.nc"),
-                    "a",
-                    format="NETCDF4",
-                )
+                nc = Dataset( os.path.join(self.config.working_dir, "ts.nc"), "a", format="NETCDF4" )
                 d = nc.variables["time"][:].shape[0]
 
                 nc.variables["time"][d] = self.t.numpy()
-                for var in ["vol", "area"]:
+                for var in ['vol','area']:
                     nc.variables[var][d] = vars()[var].numpy()
                 nc.close()
 
@@ -535,11 +530,11 @@ class igm:
 
         if self.tsave[self.itsave + 1] <= self.t.numpy() + self.dt:
             self.dt = self.tsave[self.itsave + 1] - self.t.numpy()
-            self.t.assign(self.tsave[self.itsave + 1])
+            self.t.assign( self.tsave[self.itsave + 1] )
             self.saveresult = True
             self.itsave += 1
         else:
-            self.t.assign(self.t.numpy() + self.dt)
+            self.t.assign( self.t.numpy() + self.dt )
             self.saveresult = False
 
         self.it += 1
@@ -635,22 +630,20 @@ class igm:
         """
             set-up the iceflow emulator
         """
-
+ 
         dirpath = os.path.join(self.config.model_lib_path, str(int(self.dx)))
-
+     
         assert os.path.isdir(dirpath)
-
+        
         self.read_fields_and_bounds(dirpath)
 
         self.iceflow_mapping = {}
         self.iceflow_mapping["fieldin"] = self.fieldin
         self.iceflow_mapping["fieldout"] = self.fieldout
 
-        self.iceflow_model = tf.keras.models.load_model(
-            os.path.join(dirpath, "model.h5")
-        )
+        self.iceflow_model = tf.keras.models.load_model( os.path.join(dirpath, "model.h5") )
 
-        #        print(self.iceflow_model.summary())
+#        print(self.iceflow_model.summary())
 
         Ny = self.thk.shape[0]
         Nx = self.thk.shape[1]
@@ -696,26 +689,24 @@ class igm:
             vars(self)[f].assign(
                 tf.where(self.thk > 0, Y[0, :Ny, :Nx, kk], 0) * self.fieldbounds[f]
             )
-
-        if self.config.force_max_velbar > 0:
-
+         
+        if (self.config.force_max_velbar>0):
+        
             self.velbar_mag = self.getmag(self.ubar, self.vbar)
-
-            self.ubar.assign(
-                tf.where(
-                    self.velbar_mag >= self.config.force_max_velbar,
-                    self.config.force_max_velbar * (self.ubar / self.velbar_mag),
-                    self.ubar,
-                )
-            )
-            self.vbar.assign(
-                tf.where(
-                    self.velbar_mag >= self.config.force_max_velbar,
-                    self.config.force_max_velbar * (self.vbar / self.velbar_mag),
-                    self.vbar,
-                )
-            )
-
+            
+            self.ubar.assign( 
+              tf.where( self.velbar_mag >= self.config.force_max_velbar,
+                        self.config.force_max_velbar * ( self.ubar / self.velbar_mag ),
+                        self.ubar
+                      )
+                            )
+            self.vbar.assign( 
+              tf.where( self.velbar_mag >= self.config.force_max_velbar,
+                        self.config.force_max_velbar * ( self.vbar / self.velbar_mag ),
+                        self.vbar
+                      )
+                            )
+                     
         self.tcomp["Ice flow"][-1] -= time.time()
         self.tcomp["Ice flow"][-1] *= -1
 
@@ -754,9 +745,7 @@ class igm:
                 self.tcomp["Climate"] = []
                 self.already_called_update_climate = True
 
-            new_clim_needed = (
-                self.t.numpy() - self.tlast_clim
-            ) >= self.config.clim_update_freq
+            new_clim_needed = (self.t.numpy() - self.tlast_clim) >= self.config.clim_update_freq
 
             if force | new_clim_needed:
 
@@ -866,7 +855,7 @@ class igm:
             self.tcomp["Mass balance"] = []
             if len(self.config.type_mass_balance) > 0:
                 if hasattr(self, "init_smb_" + self.config.type_mass_balance):
-                    getattr(self, "init_smb_" + self.config.type_mass_balance)()
+                     getattr(self, "init_smb_" + self.config.type_mass_balance)()
             self.already_called_update_smb = True
 
         if (force) | ((self.t.numpy() - self.tlast_mb) >= self.config.mb_update_freq):
@@ -944,22 +933,18 @@ class igm:
         #   Third, one compute the flux on the staggered grid slecting upwind quantities
         #   Last, computing the divergence on the staggered grid yields values def on the original grid
         """
-
+        
         ## Compute u and v on the staggered grid
-        u = tf.concat(
-            [u[:, 0:1], 0.5 * (u[:, :-1] + u[:, 1:]), u[:, -1:]], 1
-        )  # has shape (ny,nx+1)
-        v = tf.concat(
-            [v[0:1, :], 0.5 * (v[:-1, :] + v[1:, :]), v[-1:, :]], 0
-        )  # has shape (ny+1,nx)
+        u = tf.concat([u[:, 0:1], 0.5 * (u[:, :-1] + u[:, 1:]), u[:, -1:]], 1) # has shape (ny,nx+1)
+        v = tf.concat([v[0:1, :], 0.5 * (v[:-1, :] + v[1:, :]), v[-1:, :]], 0) # has shape (ny+1,nx)
 
         # Extend h with constant value at the domain boundaries
-        Hx = tf.pad(h, [[0, 0], [1, 1]], "CONSTANT")  # has shape (ny,nx+2)
-        Hy = tf.pad(h, [[1, 1], [0, 0]], "CONSTANT")  # has shape (ny+2,nx)
+        Hx = tf.pad(h, [[0, 0], [1, 1]], "CONSTANT")    # has shape (ny,nx+2)
+        Hy = tf.pad(h, [[1, 1], [0, 0]], "CONSTANT")    # has shape (ny+2,nx)
 
         ## Compute fluxes by selcting the upwind quantities
-        Qx = u * tf.where(u > 0, Hx[:, :-1], Hx[:, 1:])  # has shape (ny,nx+1)
-        Qy = v * tf.where(v > 0, Hy[:-1, :], Hy[1:, :])  # has shape (ny+1,nx)
+        Qx = u * tf.where(u > 0, Hx[:, :-1], Hx[:, 1:]) # has shape (ny,nx+1)
+        Qy = v * tf.where(v > 0, Hy[:-1, :], Hy[1:, :]) # has shape (ny+1,nx)
 
         ## Computation of the divergence, final shape is (ny,nx)
         return (Qx[:, 1:] - Qx[:, :-1]) / dx + (Qy[1:, :] - Qy[:-1, :]) / dy
@@ -1035,10 +1020,7 @@ class igm:
                 plt.savefig(
                     os.path.join(
                         self.config.working_dir,
-                        self.config.varplot
-                        + "-"
-                        + str(self.t.numpy()).zfill(4)
-                        + ".png",
+                        self.config.varplot + "-" + str(self.t.numpy()).zfill(4) + ".png",
                     ),
                     bbox_inches="tight",
                     pad_inches=0.2,
@@ -1189,7 +1171,7 @@ class igm:
             self.update_iceflow()
 
             self.update_ncdf_ex()
-
+            
             self.update_ncdf_ts()
 
             self.print_info()
@@ -1212,7 +1194,7 @@ class igm:
                     self.update_topg()
 
                 self.update_ncdf_ex()
-
+                
                 self.update_ncdf_ts()
 
                 self.update_plot()
@@ -1223,7 +1205,6 @@ class igm:
                 self.tcomp["All"][-1] *= -1
 
         self.print_all_comp_info()
-
 
 ####################################################################################
 ####################################################################################
