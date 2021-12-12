@@ -49,6 +49,8 @@ Once the above packages have been installed, you may already run ready-to-use ex
 
 - cluster-simple is simlar to aletsch-simple, but over a wider domain including a tens of glaciers to demonstrate the capability of IGM to model a glacier network.
  
+- aletsch-1880-2100 gives the set-up to reproduce the [simulations](https://www.geo.uzh.ch/~gjouvet/the-aletsch-glacier-module/) of the Great Aletsch Glacier (Switzerland) in the [past](https://www.cambridge.org/core/journals/journal-of-glaciology/article/modelling-the-retreat-of-grosser-aletschgletscher-switzerland-in-a-changing-climate/C877413079F73C5FC6131FC7BC031B69) and in the [future](https://www.cambridge.org/core/journals/journal-of-glaciology/article/future-retreat-of-great-aletsch-glacier/EB46DC696E0AB9528168F42595EE23D9) based on the CH2018 climate scenarios and an accumulation/melt model.
+ 
 # About the code
 
 The IGM code is packed into a single file `src/igm.py`, which defines the class `igm` and contains all what we need -- variables and functions -- to run a time evolution glacier model. Just explore it.
