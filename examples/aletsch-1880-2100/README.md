@@ -25,6 +25,8 @@ Then you may run
 
 and try to change the starting year within igm-run.py to 1880, 1926, 1957, 1980, 1999, 2009, or 2017.
 
+Last but not least, you may try (starting from 2017) to activate in igm-run.py a mass balance model, which is a convolutional neural network (CNN) trained from climate and mass balance data (from Aletsch and Rhone Glaciers). This can be seen as an alternative to the accumulation / melt model. Therefore, you must set igm.config.type_mass_balance to 'nn', provide a valid path for the mass balance emulator igm.config.smb_model_lib_path, and also force monthly climate inputs (instead of daily) setting igm.config.clim_time_resolution to 12.
+
 Note that igm-run.py builds on the core igm class, and two class extensions (igm_smb_accmelt.py and igm_clim_aletsch.py), which implement the climate forcing and the mass balance, respectively.
 
 # References	

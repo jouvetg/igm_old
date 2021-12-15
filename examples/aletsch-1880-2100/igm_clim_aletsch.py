@@ -15,6 +15,16 @@ import time
 
 class igm_clim_aletsch:
 
+    def read_config_param_climate_aletsch(self):
+
+        # CLIMATE PARAMETERS
+        self.parser.add_argument(
+            "--clim_time_resolution",
+            type=float,
+            default=365,
+            help="Give the resolution the climate forcing should be (monthly=12, daily=365)",
+        ) 
+
     def load_climate_data_aletsch(self):
         """
             load climate data to run the Aletsch Glacier simulation
@@ -38,18 +48,22 @@ class igm_clim_aletsch:
         self.prec = np.zeros((365, ymax - ymin + 1), dtype=np.float32)
         self.year = np.zeros((ymax - ymin + 1), dtype=np.float32)
 
-        # retrieve temp [unit °C] and prec [unit is m ice eq. / d] and year
+        # retrieve temp [unit °C] and prec [unit is m ice eq. / y] and year
         for k, y in enumerate(range(ymin, ymax + 1)):
             IND = (temp_prec[:, 0] == y) & (temp_prec[:, 1] <= 365)
             self.prec[:, k] = (
-                temp_prec[IND, -1] / 1000.0
-            ) / 0.917  # new unit is m ice eq. / d
+                temp_prec[IND, -1] * 365.0 / 1000.0
+            ) / 0.917  # new unit is m ice eq. / y
             self.temp[:, k] = temp_prec[IND, -2]  # new unit is °C
             self.year[k] = y
 
-        # shift prec and temp to hydrological year
-        self.prec = np.roll(self.prec, 91, axis=0)
-        self.temp = np.roll(self.temp, 91, axis=0)
+        # this make monthly temp and prec if this is wished
+        if self.config.clim_time_resolution==12:
+            II = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 364]
+            self.prec = np.stack([np.mean(self.prec[II[i]:II[i+1]],axis=0) 
+                                  for i in range(0,12) ] )
+            self.temp = np.stack([np.mean(self.temp[II[i]:II[i+1]],axis=0) 
+                                  for i in range(0,12) ] )
 
         # intitalize air_temp and precipitation fields
         self.air_temp = tf.Variable(

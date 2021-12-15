@@ -192,6 +192,9 @@ class igm:
                 vars(self)[var] = tf.Variable(
                     np.squeeze(nc.variables[var]).astype("float32")
                 )
+                vars(self)[var].assign( 
+                    tf.where(vars(self)[var] >10**35, np.nan, vars(self)[var])
+                )
 
         nc.close()
 
@@ -587,28 +590,30 @@ class igm:
             get fields (input and outputs) from given file
         """
 
-        self.fieldbounds = {}
-        self.fieldin = []
-        self.fieldout = []
+        fieldbounds = {}
+        fieldin = []
+        fieldout = []
 
         fid = open(os.path.join(path, "fieldin.dat"), "r")
         for fileline in fid:
             part = fileline.split()
-            self.fieldin.append(part[0])
-            self.fieldbounds[part[0]] = float(part[1])
+            fieldin.append(part[0])
+            fieldbounds[part[0]] = float(part[1])
         fid.close()
 
         fid = open(os.path.join(path, "fieldout.dat"), "r")
         for fileline in fid:
             part = fileline.split()
-            self.fieldout.append(part[0])
-            self.fieldbounds[part[0]] = float(part[1])
+            fieldout.append(part[0])
+            fieldbounds[part[0]] = float(part[1])
         fid.close()
+        
+        return fieldin,fieldout,fieldbounds
 
     def read_config_param_iceflow(self):
 
         self.parser.add_argument(
-            "--model_lib_path",
+            "--iceflow_model_lib_path",
             type=str,
             default="/home/jouvetg/IGM/model-lib/f12_cfsflow",
             help="model directory",
@@ -631,15 +636,16 @@ class igm:
             set-up the iceflow emulator
         """
  
-        dirpath = os.path.join(self.config.model_lib_path, str(int(self.dx)))
+        dirpath = os.path.join(self.config.iceflow_model_lib_path, str(int(self.dx)))
      
         assert os.path.isdir(dirpath)
         
-        self.read_fields_and_bounds(dirpath)
+        fieldin,fieldout,fieldbounds = self.read_fields_and_bounds(dirpath)
 
         self.iceflow_mapping = {}
-        self.iceflow_mapping["fieldin"] = self.fieldin
-        self.iceflow_mapping["fieldout"] = self.fieldout
+        self.iceflow_mapping["fieldin"]  = fieldin
+        self.iceflow_mapping["fieldout"] = fieldout
+        self.iceflow_fieldbounds         = fieldbounds
 
         self.iceflow_model = tf.keras.models.load_model( os.path.join(dirpath, "model.h5") )
 
@@ -674,7 +680,7 @@ class igm:
         X = tf.expand_dims(
             tf.stack(
                 [
-                    tf.pad(vars(self)[f], self.PAD, "CONSTANT") / self.fieldbounds[f]
+                    tf.pad(vars(self)[f], self.PAD, "CONSTANT") / self.iceflow_fieldbounds[f]
                     for f in self.iceflow_mapping["fieldin"]
                 ],
                 axis=-1,
@@ -687,7 +693,7 @@ class igm:
         Ny, Nx = self.thk.shape
         for kk, f in enumerate(self.iceflow_mapping["fieldout"]):
             vars(self)[f].assign(
-                tf.where(self.thk > 0, Y[0, :Ny, :Nx, kk], 0) * self.fieldbounds[f]
+                tf.where(self.thk > 0, Y[0, :Ny, :Nx, kk], 0) * self.iceflow_fieldbounds[f]
             )
          
         if (self.config.force_max_velbar>0):
@@ -784,13 +790,22 @@ class igm:
             help="zero, simple, given",
         )
         self.parser.add_argument(
-            "--mb_scaling", type=float, default=1.0, help="mass balance scaling"
+            "--mb_scaling", 
+            type=float, 
+            default=1.0, 
+            help="mass balance scaling"
         )
         self.parser.add_argument(
             "--mb_simple_file",
             type=str,
             default="mb_simple_param.txt",
             help="mb_simple_file",
+        )
+        self.parser.add_argument(
+            "--smb_model_lib_path",
+            type=str,
+            default="/home/jouvetg/IGM/model-lib/smb_meteoswissglamos",
+            help="Model directory in case the smb model in use is 'nn'for neural netowrk",
         )
 
     def init_smb_simple(self):
@@ -844,6 +859,54 @@ class igm:
         smb = tf.where(self.icemask > 0.5, smb, -10)
 
         self.smb.assign(smb)
+         
+    def init_smb_nn(self):
+        """
+            set-up the smb nn emulator
+        """
+ 
+        dirpath = os.path.join(self.config.smb_model_lib_path, str(int(self.dx)))
+     
+        assert os.path.isdir(dirpath)
+        
+        fieldin,fieldout,fieldbounds = self.read_fields_and_bounds(dirpath)
+        
+        self.read_fields_and_bounds(dirpath)
+
+        self.smb_mapping             = {}
+        self.smb_mapping["fieldin"]  = fieldin
+        self.smb_mapping["fieldout"] = fieldout
+        self.smb_fieldbounds         = fieldbounds
+
+        self.smb_model = tf.keras.models.load_model( os.path.join(dirpath, "model.h5") )
+
+    def update_smb_nn(self):
+        """
+            function update the smb using the neural network emulator
+        """
+
+        # this is not a nice implementation, but for now, it does the job
+        self.mask = tf.ones_like(self.thk)
+        for i in range(12):
+            vars(self)['air_temp_'+str(i)]      = self.air_temp[i]
+            vars(self)['precipitation_'+str(i)] = self.precipitation[i]
+
+        X = tf.expand_dims(
+            tf.stack(
+                [ 
+                    vars(self)[f] / self.smb_fieldbounds[f] 
+                    for f in self.smb_mapping["fieldin"] 
+                ],
+                axis=-1,
+            ),
+            axis=0,
+        )
+
+        Y = self.smb_model.predict_on_batch(X)
+        
+        # this will return the smb, the only output of the smb nn emulator
+        for kk, f in enumerate(self.smb_mapping["fieldout"]):
+            vars(self)[f].assign( Y[0, :, :, kk] * self.smb_fieldbounds[f] )  
 
     def update_smb(self, force=False):
         """

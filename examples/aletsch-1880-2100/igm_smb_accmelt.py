@@ -46,6 +46,12 @@ class igm_smb_accmelt:
             default=2.5,
             help="Threshold temperature for liquid precipitation (2.0)",
         )
+        self.parser.add_argument(
+            "--shift_hydro_year",
+            type=float,
+            default=0.75,
+            help="This serves to start Oct 1. the acc/melt computation (0.75)",
+        )
 
     def init_smb_accmelt(self):
         """
@@ -77,10 +83,7 @@ class igm_smb_accmelt:
         db = np.arange(1, 366)
         self.direct_radiation = interp1d(
             da, self.direct_radiation, kind="linear", axis=0, fill_value="extrapolate")(db)
-        
-        # shift to hydrological year (i.e. start Oct 1)
-        self.direct_radiation = np.roll(self.direct_radiation, 91, axis=0)
-        
+                
         self.direct_radiation = tf.Variable(self.direct_radiation, dtype="float32")
 
         # read mass balance parameters
@@ -138,6 +141,9 @@ class igm_smb_accmelt:
             ),
         )
 
+        # unit to [ m ice eq. / y ] -> [ m ice eq. / d ]
+        accumulation /= accumulation.shape[0] 
+
         # correct for snow re-distribution
         accumulation *= self.snow_redistribution  # unit to [ m ice eq. / d ]
 
@@ -145,12 +151,15 @@ class igm_smb_accmelt:
 
         pos_temp = tf.where(self.air_temp > 0.0, self.air_temp, 0.0)  # unit is [°C]
 
-        ablation = []  # [ unit : ice-eq. m ]
+        ablation = []  # [ unit : ice-eq. m / d ]
  
         # the snow depth (=0 or >0) is necessary to find what melt factor to apply
         snow_depth = tf.zeros((self.air_temp.shape[1], self.air_temp.shape[2]))
-
-        for k in range(self.air_temp.shape[0]):
+            
+        for kk in range(self.air_temp.shape[0]):
+             
+            # shift to hydro year, i.e. start Oct. 1
+            k = (kk+int(self.air_temp.shape[0]*self.config.shift_hydro_year))%(self.air_temp.shape[0]) 
 
             # add accumulation to the snow depth
             snow_depth += accumulation[k]
@@ -169,7 +178,7 @@ class igm_smb_accmelt:
             ablation[-1] *= self.config.weight_ablation
 
             # remove snow melt to snow depth, and cap it as snow_depth can not be negative
-            snow_depth = tf.clip_by_value(snow_depth - ablation[k], 0.0, 1.0e10)
+            snow_depth = tf.clip_by_value(snow_depth - ablation[-1], 0.0, 1.0e10)
 
         # Time integration of accumulation minus ablation
         self.smb.assign(tf.math.reduce_sum(accumulation - ablation, axis=0))

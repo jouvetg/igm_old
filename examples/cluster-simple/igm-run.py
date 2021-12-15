@@ -11,7 +11,7 @@ igm.config.tend              = 1250
 igm.config.tsave             = 2
 igm.config.cfl               = 0.5
 igm.config.init_strflowctrl  = 90
-igm.config.model_lib_path    = '../../model-lib/f12_cfsflow_GJ_21_a'
+igm.config.iceflow_model_lib_path    = '../../model-lib/f12_cfsflow_GJ_21_a'
 igm.config.type_mass_balance = 'simple'
 igm.config.usegpu            = True
 

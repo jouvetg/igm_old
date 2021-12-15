@@ -29,10 +29,18 @@ igm.config.tsave                 = 1
 igm.config.init_strflowctrl      = 78
 igm.config.cfl                   = 0.25
 
-igm.config.model_lib_path        = '../../model-lib/f12_cfsflow_GJ_21_a'
-igm.config.type_mass_balance     = 'accmelt'
+igm.config.iceflow_model_lib_path= '../../model-lib/f12_cfsflow_GJ_21_a'
+
 igm.config.type_climate          = 'aletsch'
+
+# option 1: traditional ams model (acc / melt) -- uncoment these lines
+igm.config.type_mass_balance     = 'accmelt'
 igm.config.climate_file          = 'massbalance.nc'
+
+# option 2: emulated smb model by a CNN -- uncoment these lines
+#igm.config.smb_model_lib_path    = '../../model-lib/smb1_meteoswissglamos_GJ_21_a'
+#igm.config.type_mass_balance     = 'nn'
+#igm.config.clim_time_resolution  = 12
 
 igm.config.weight_accumulation   = 1.00
 igm.config.weight_ablation       = 1.25
