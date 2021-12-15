@@ -216,9 +216,9 @@ You may find trained and reas-to-use ice flow emulators in the folder `model-lib
 
 For now, only the emulator trained by CfsFlow is available with different resolutions. If you are unhappy with the proposed list of emulators, consider training your own with the [Deep Learning Emulator](https://github.com/jouvetg/dle).
 
-# Using Convolutional Neural Network to model mass balance (experimental)
+# Using an emulated mass balance model (experimental)
 
-The structure of IGM facilitates the embeding of further emulators beyond the ice flow model assuming that it maps 2D gridded fields to 2D gridded fields similarly to the ice flow one. This applies to predict surface mass balance from temperature and precipitation fields. IGM permits to embed a neural network emulator to model mass balance. As an illustration, I have trained a Convolutional Neural Network (CNN) from climate and mass balance data from glaciers in the Alps using the [Deep Learning Emulator](https://github.com/jouvetg/dle). To use it, check at the example aletsch-1880-2100.
+The structure of IGM facilitates the embeding of further emulators beyond the ice flow model assuming that it maps 2D gridded fields to 2D gridded fields similarly to the ice flow one. This applies to predict surface mass balance from temperature and precipitation fields. IGM permits to embed a neural network emulator to model mass balance. As an illustration, I have trained a Convolutional Neural Network (CNN) from climate and mass balance data from glaciers in the Alps using the [Deep Learning Emulator](https://github.com/jouvetg/dle). To try it, check at the example aletsch-1880-2100. Note that this is highly experimental considering that so far i) the training dataset is small ii) CNN is overkilled here iii) no assessment was done.
 
 # Data assimilation / Invert modelling
 
