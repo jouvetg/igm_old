@@ -53,13 +53,29 @@ class igm_smb_accmelt:
             help="This serves to start Oct 1. the acc/melt computation (0.75)",
         )
 
+        self.parser.add_argument(
+            "--weight_Aletschfirn",
+            type=float,
+            default=1.0, 
+        )
+        self.parser.add_argument(
+            "--weight_Jungfraufirn",
+            type=float,
+            default=1.0, 
+        )
+        self.parser.add_argument(
+            "--weight_Ewigschneefeld",
+            type=float,
+            default=1.0, 
+        )
+
     def init_smb_accmelt(self):
         """
             load smb data to run the Aletsch Glacier simulation 
         """
 
         nc = Dataset(
-            os.path.join(self.config.working_dir, self.config.climate_file), "r"
+            os.path.join(self.config.working_dir, self.config.massbalance_file), "r"
         )
         x = np.squeeze(nc.variables["x"]).astype("float32")
         y = np.squeeze(nc.variables["y"]).astype("float32")
@@ -94,6 +110,13 @@ class igm_smb_accmelt:
                 dtype=np.float32,
             )
         )
+
+        # This permits to give some weight to some of the accumaulation bassins
+        if not ((self.config.weight_Aletschfirn==1.0)&(self.config.weight_Jungfraufirn==1.0)&(self.config.weight_Ewigschneefeld==1.0)):
+            self.snow_redistribution *= (1.0/3.0)* \
+               ( self.config.weight_Aletschfirn    * self.Aletschfirn     + (1-self.Aletschfirn) \
+               + self.config.weight_Jungfraufirn   * self.Jungfraufirn    + (1-self.Jungfraufirn) \
+               + self.config.weight_Ewigschneefeld * self.Ewigschneefeld  + (1-self.Ewigschneefeld) )
 
         # snow_redistribution must have shape like precipitation (365,ny,nx)
         self.snow_redistribution = tf.expand_dims(self.snow_redistribution, axis=0)

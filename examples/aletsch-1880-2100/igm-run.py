@@ -35,7 +35,7 @@ igm.config.type_climate          = 'aletsch'
 
 # option 1: traditional ams model (acc / melt) -- uncoment these lines
 igm.config.type_mass_balance     = 'accmelt'
-igm.config.climate_file          = 'massbalance.nc'
+igm.config.massbalance_file      = 'massbalance.nc'
 
 # option 2: emulated smb model by a CNN -- uncoment these lines
 #igm.config.smb_model_lib_path    = '../../model-lib/smb1_meteoswissglamos_GJ_21_a'
@@ -50,6 +50,12 @@ igm.config.usegpu                = True
 igm.config.varplot_max           = 250
 igm.config.plot_result           = False
 igm.config.plot_live             = False
+
+# This permits to give sme weight to accumaulation bassins
+igm.config.weight_Aletschfirn    = 1.0
+igm.config.weight_Jungfraufirn   = 1.0
+igm.config.weight_Ewigschneefeld = 1.0
+
 
 # From now, we could have call igm.run(), but we instead give all steps to embed some 
 # features like defining initial surface, or check modelled vs observed top DEM std
@@ -74,6 +80,8 @@ with tf.device(igm.device_name):
     igm.print_info()
 
     while igm.t < igm.config.tend:
+        
+        igm.tcomp["All"].append(time.time())
              
         # For thes year, check the std between modelled and observed surfaces
         if igm.t in [1926,1957,1980,1999,2009,2017]:
@@ -94,5 +102,8 @@ with tf.device(igm.device_name):
         igm.update_ncdf_ts()
         igm.update_plot()
         igm.print_info()
+        
+        igm.tcomp["All"][-1] -= time.time()
+        igm.tcomp["All"][-1] *= -1
         
     igm.print_all_comp_info()
