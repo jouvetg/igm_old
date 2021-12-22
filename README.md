@@ -3,7 +3,7 @@
 
 # Notice 
 
-IGM is a very young code, which has been shortly distributed after the publication of our paper in Journal of Glaciology expected in December 2021. More features will come in the next months (e.g., data assimilation). IGM is in a preliminary phase, which aims to illustrate its potential with simple examples and get feedback from the community. If you have ideas of extensions or applications, you would like to contribute, please contact me at guillaume.jouvet at uzh.geo.ch.
+IGM is a very young code, which has been shortly distributed after the publication of our [paper](https://www.doi.org/10.1017/jog.2021.120) in Journal of Glaciology. More features will come in the next months (e.g., data assimilation). IGM is in a preliminary phase, which aims to illustrate its capacities with simple examples and get feedback from the community. If you have ideas of extensions or applications, you would like to contribute, please contact me first at guillaume.jouvet at uzh.geo.ch.
 
 # Overview   
 
@@ -43,7 +43,7 @@ You may additionally install spyder, which is a nice matlab-looking free editor:
 	
 # Quick start with examples
 
-Once the above packages have been installed, you may already run ready-to-use examples in the folder `examples/`, which contains input data and scripts with necessary commands. To date, it contains two examples:
+The best way to get to know IGM is to run given examples. The easiest way is to run notebooks (in the dedicated folder) in [Google Colab](https://colab.research.google.com/), which offers free access to GPU. Otherwise, once the above packages have been installed, you may already run ready-to-use examples in the folder `examples/`, which contains input data and scripts with necessary commands. To date, it contains three examples:
 
 - aletsch-simple provides a simple set-up for an advance-retreat simulation of the largest glacier of the European Alps -- Aletsch Glacier, Switzerland -- using a simple parametrization of the mass balance based on time-varying Equilibrium Line Altitudes (ELA), as well as an example of a fully-custumized mass balance routine implementing an oscilitating ELA.
 
@@ -230,11 +230,16 @@ In practise, GPUs outperform CPUs most of the time to run IGM, and I therefore a
 
 # Reference
 
+If you use IGM in publications, make sure to cite the code and emulator versions/references you use, as well as the following [paper](https://www.doi.org/10.1017/jog.2021.120).
+
 	@article{IGM,
-	  author       = "G. Jouvet, G. Cordonnier, B. Kim, M. Luethi, A. Vieli, A. Aschwanden",  
+	  author       = "Jouvet, Guillaume and Cordonnier, Guillaume and Kim, Byungsoo and Lüthi, Martin and Vieli, Andreas and Aschwanden, Andy",  
 	  title        = "Deep learning speeds up ice flow modelling by several orders of magnitude",
+	  DOI          = "10.1017/jog.2021.120",
 	  journal      = "Journal of Glaciology",
-	  year         = 2021,
+	  year         =  2021,
+	  pages        = "1–14",
+	  publisher    = "Cambridge University Press"
 	}
 
 # Acknowledgements
