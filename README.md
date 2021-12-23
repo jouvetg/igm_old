@@ -43,7 +43,7 @@ You may additionally install spyder, which is a nice matlab-looking free editor:
 	
 # Quick start with examples
 
-The best way to get to know IGM is to run given examples. The easiest way is to run notebooks (in the dedicated folder) in [Google Colab](https://colab.research.google.com/), which offers free access to GPU. Otherwise, once the above packages have been installed, you may already run ready-to-use examples in the folder `examples/`, which contains input data and scripts with necessary commands. To date, it contains three examples:
+The best way to get to know IGM is to run given examples. The easiest way is to run notebooks in [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jouvetg/igm/], which offers free access to GPU. Otherwise, once the above packages have been installed, you may already run ready-to-use examples in the folder `examples/`, which contains input data and scripts with necessary commands. To date, it contains three examples:
 
 - aletsch-simple provides a simple set-up for an advance-retreat simulation of the largest glacier of the European Alps -- Aletsch Glacier, Switzerland -- using a simple parametrization of the mass balance based on time-varying Equilibrium Line Altitudes (ELA), as well as an example of a fully-custumized mass balance routine implementing an oscilitating ELA.
 
