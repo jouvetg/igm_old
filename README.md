@@ -195,7 +195,7 @@ Up to date, ice flow instructor models I used have two critical parameters, whic
 
 ![Alt text](./fig/strflowctrl.png)
 
-# Inputs / Outputs
+# Input / Output
 
 Preferred and default format for I/O in IGM is NetCDF file. We now shortly describe the input and output files in turn.
 
