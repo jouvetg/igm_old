@@ -246,9 +246,9 @@ If you use IGM in publications, make sure to cite the code and emulator versions
 
 I greatly thank [Guillaume Cordonnier](https://www-sop.inria.fr/members/Guillaume.Cordonnier/) for his valuable help with the TensorFlow implementation. The [Parallel Ice Sheet Model](https://pism-docs.org) has greatly inspired the naming of variables, as well as the format of input and output NetCDF files.
 
-# IGM related PhD and Master project offers
+# IGM related Master and PhD project offers
 
-I'm currently looking for a PhD student to work with IGM at [reconstructing paleo climate using invert glacier model and deep learning](https://career012.successfactors.eu/career?career%5fns=job%5flisting&company=universitdP&navBarLevel=JOB%5fSEARCH&rcm%5fsite%5flocale=en%5fUS&career_job_req_id=18564&selected_lang=en_US&jobAlertController_jobAlertId=&jobAlertController_jobAlertName=&browserTimeZone=Europe/Zurich&_s.crb=mnvAetVZ8lLAT15eNSLmJABWuEdCyhqo4zhua52ug98%3d).
+I'm currently seeking for students (at Master or PhD level) to develop IGM. If you are interested, just get in touch with me.
 
 # Contact
 

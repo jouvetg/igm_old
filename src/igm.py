@@ -13,6 +13,7 @@ functions are sorted by thema, which are
 #      ICEFLOW : Containt the function that serve compute the emulated iceflow
 #      CLIMATE : Templates for function updating climate
 #      MASS BALANCE : Simple mass balance
+#      EROSION : Erosion law
 #      TRANSPORT : This handles the mass conservation
 #      PLOT : Plotting functions
 #      PRINT INFO : handle the printing of output during computation
@@ -65,6 +66,9 @@ class igm:
             "--geology_file", type=str, default="geology.nc", help="Geology input file"
         )
         self.parser.add_argument(
+            "--resample", type=int, default=1, help="Upsample the data from geology.nc"
+        ) 
+        self.parser.add_argument(
             "--tstart", type=float, default=0.0, help="Starting time"
         )
         self.parser.add_argument("--tend", type=float, default=150.0, help="End time")
@@ -107,6 +111,14 @@ class igm:
         self.parser.add_argument(
             "--init_strflowctrl", type=float, default=78, help="Initial strflowctrl",
         )
+
+        self.parser.add_argument(
+            "--init_slidingco", type=float, default=0, help="Initial slidingco",
+        )        
+        self.parser.add_argument(
+            "--init_arrhenius", type=float, default=78, help="Initial arrhenius",
+        )        
+        
         self.parser.add_argument(
             "--optimize",
             type=str2bool,
@@ -177,24 +189,29 @@ class igm:
 
         nc = Dataset(os.path.join(self.config.working_dir, filename), "r")
 
-        if not hasattr(self, "x"):
-            self.x = tf.constant(np.squeeze(nc.variables["x"]).astype("float32"))
-            self.y = tf.constant(np.squeeze(nc.variables["y"]).astype("float32"))
-            assert self.x[1] - self.x[0] == self.y[1] - self.y[0]
-        else:
-            xx = tf.constant(np.squeeze(nc.variables["x"]).astype("float32"))
-            yy = tf.constant(np.squeeze(nc.variables["y"]).astype("float32"))
-            assert self.x == xx
-            assert self.y == yy
-
+        x = np.squeeze(nc.variables["x"]).astype("float32")
+        y = np.squeeze(nc.variables["y"]).astype("float32")
+        assert x[1] - x[0] == y[1] - y[0]
+        
         for var in nc.variables:
             if not var in ["x", "y"]:
-                vars(self)[var] = tf.Variable(
-                    np.squeeze(nc.variables[var]).astype("float32")
-                )
-                vars(self)[var].assign( 
-                    tf.where(vars(self)[var] >10**35, np.nan, vars(self)[var])
-                )
+                vars()[var] = np.squeeze(nc.variables[var]).astype("float32")
+                vars()[var] = np.where(vars()[var] >10**35, np.nan, vars()[var])
+                
+        if self.config.resample>1:
+            xx = x[::self.config.resample]
+            yy = y[::self.config.resample]
+            for var in nc.variables:
+                if not var in ["x", "y"]:
+                    vars()[var]  = RectBivariateSpline(y, x, vars()[var])(yy,xx) 
+            x = xx
+            y = yy
+    
+        for var in nc.variables: 
+            if var in ["x", "y"]:
+                vars(self)[var] = tf.constant(vars()[var].astype("float32"))
+            else:
+                vars(self)[var] = tf.Variable(vars()[var].astype("float32"))
 
         nc.close()
 
@@ -946,6 +963,78 @@ class igm:
 
             self.tcomp["Mass balance"][-1] -= time.time()
             self.tcomp["Mass balance"][-1] *= -1
+            
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+    #                              BASAL EROSION
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+    
+    def read_config_param_erosion(self):
+         
+        self.parser.add_argument(
+            "--erosion_include",
+            type=str2bool,
+            default=False,
+            help="Include a model for bedrock erosion",
+        )
+        self.parser.add_argument(
+            "--erosion_cst",
+            type=float,
+            default=5.2*10**(-11),
+            help="from Koppes et al., 2015, unit is (m/y)**(1-l)",
+        )
+        self.parser.add_argument(
+            "--erosion_exp",
+            type=float,
+            default=2.34,
+            help="from Koppes et al., 2015",
+        )
+        self.parser.add_argument(
+            "--erosion_update_freq",
+            type=float,
+            default=100,
+            help="Update the erosion only each 100 years",
+        )
+    
+    def update_topg(self):
+        """
+            update bedrock due to glacial errosion,
+            eroson rate are proportional to a power
+            of the sliding velocity magnitude
+        """
+        
+        if self.config.erosion_include:
+            
+            if not hasattr(self,'already_called_update_topg'):
+                self.tlast_erosion    = self.config.tstart
+                self.tcomp["Erosion"] = []
+                self.already_called_update_topg = True
+                
+            if ((self.t - self.tlast_erosion) >= self.config.erosion_update_freq):
+    
+                if self.config.verbosity == 1:
+                    print("Erode bedrock at time : ", self.t)
+                    
+                self.tcomp["Erosion"].append(time.time()) 
+                                
+                self.velbase_mag = self.getmag(self.uvelbase, self.vvelbase)
+                
+                dtopg = (self.t - self.tlast_erosion) * self.config.erosion_cst \
+                                                      * (self.velbase_mag**self.config.erosion_exp)
+          
+                self.topg.assign( self.topg - dtopg )
+    
+#                print('max erosion is :', np.max( np.abs ( dtopg ) ) )
+
+                self.usurf.assign( self.topg + self.thk )
+                
+                self.tlast_erosion = self.t
+                
+                self.tcomp["Erosion"][-1] -= time.time()
+                self.tcomp["Erosion"][-1] *= -1 
 
     ####################################################################################
     ####################################################################################
@@ -1133,6 +1222,51 @@ class igm:
             os.path.join(self.config.working_dir, "PIE-COMPUTATIONAL.png"), pad_inches=0
         )
         plt.close("all")
+        
+    def animate_result(self,file,vari,save=False):
+        
+        from IPython.display import HTML, display
+        import xarray as xr 
+        from matplotlib import pyplot as plt, animation
+         
+        data  = xr.open_dataset(file,engine='netcdf4')[vari]    ;
+        
+        minvar = np.min(data)
+        maxvar = np.max(data)
+        
+        if vari=='divflux':
+            maxvar = 10
+            minvar = -10
+        
+        thk  = xr.open_dataset(file,engine='netcdf4')['thk']  
+        
+        data = xr.where(thk>1,data,np.nan)
+         
+        ratio = self.y.shape[0]/self.x.shape[0]
+        
+        fig, ax = plt.subplots(figsize=(6,6*ratio),dpi=200)
+        
+        # Plot the initial frame. 
+        cax = data[0,:,:].plot(add_colorbar=True,cmap=plt.cm.get_cmap('jet', 20),vmin=minvar, vmax=maxvar)
+        ax.axis("off") ; ax.axis("equal")
+        
+        # dont' show the original frame
+        plt.close()
+        
+        def animate(i):
+            cax.set_array(data[i,:,:].values.flatten())
+            if 'iterations' in data.coords.variables:
+                ax.set_title("It = " + str(data.coords['iterations'].values[i])[:13])
+            else:
+                ax.set_title("Time = " + str(data.coords['time'].values[i])[:13])
+        
+        ani = animation.FuncAnimation( fig, animate, frames=data.shape[0], interval=100 ) # interval in ms between frames
+        
+        HTML(ani.to_html5_video())
+        
+        # optionally the animation can be saved in avi
+        if save:
+            ani.save(file.split('.')[0]+'-'+vari+'.mp4')
 
     ####################################################################################
     ####################################################################################
