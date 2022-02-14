@@ -1223,9 +1223,9 @@ class igm:
         )
         plt.close("all")
         
-    def animate_result(self,file,vari,save=False):
+    def animate_result(self,file,vari):
         
-        from IPython.display import HTML, display
+#        from IPython.display import HTML, display
         import xarray as xr 
         from matplotlib import pyplot as plt, animation
          
@@ -1259,14 +1259,14 @@ class igm:
                 ax.set_title("It = " + str(data.coords['iterations'].values[i])[:13])
             else:
                 ax.set_title("Time = " + str(data.coords['time'].values[i])[:13])
+         
+        return animation.FuncAnimation( fig, animate, frames=data.shape[0], interval=100 ) # interval in ms between frames
         
-        ani = animation.FuncAnimation( fig, animate, frames=data.shape[0], interval=100 ) # interval in ms between frames
+        # HTML(ani.to_html5_video())
         
-        HTML(ani.to_html5_video())
-        
-        # optionally the animation can be saved in avi
-        if save:
-            ani.save(file.split('.')[0]+'-'+vari+'.mp4')
+        # # optionally the animation can be saved in avi
+        # if save:
+        #     ani.save(file.split('.')[0]+'-'+vari+'.mp4')
 
     ####################################################################################
     ####################################################################################
