@@ -1222,24 +1222,17 @@ class igm:
             os.path.join(self.config.working_dir, "PIE-COMPUTATIONAL.png"), pad_inches=0
         )
         plt.close("all")
-          
-    def animate(self,i):
-        self.anim_cax.set_array(self.anim_data[i,:,:].values.flatten())
-        if 'iterations' in self.anim_data.coords.variables:
-            self.anim_ax.set_title("It = " + str(self.anim_data.coords['iterations'].values[i])[:13])
-        else:
-            self.anim_ax.set_title("Time = " + str(self.anim_data.coords['time'].values[i])[:13])
-         
-    def animate_result(self,file,vari):
+        
+    def animate_result(self,file,vari,save=False):
         
         from IPython.display import HTML, display
         import xarray as xr 
         from matplotlib import pyplot as plt, animation
          
-        self.anim_data  = xr.open_dataset(file,engine='netcdf4')[vari]    ;
+        data  = xr.open_dataset(file,engine='netcdf4')[vari]    ;
         
-        minvar = np.min(self.anim_data)
-        maxvar = np.max(self.anim_data)
+        minvar = np.min(data)
+        maxvar = np.max(data)
         
         if vari=='divflux':
             maxvar = 10
@@ -1247,20 +1240,33 @@ class igm:
         
         thk  = xr.open_dataset(file,engine='netcdf4')['thk']  
         
-        self.anim_data = xr.where(thk>1,self.anim_data,np.nan)
+        data = xr.where(thk>1,data,np.nan)
          
         ratio = self.y.shape[0]/self.x.shape[0]
         
-        self.anim_fig, self.anim_ax = plt.subplots(figsize=(6,6*ratio),dpi=200)
+        fig, ax = plt.subplots(figsize=(6,6*ratio),dpi=200)
         
         # Plot the initial frame. 
-        self.anim_cax = self.anim_data [0,:,:].plot(add_colorbar=True,cmap=plt.cm.get_cmap('jet', 20),vmin=minvar, vmax=maxvar)
-        self.anim_ax.axis("off") ; self.anim_ax.axis("equal")
+        cax = data[0,:,:].plot(add_colorbar=True,cmap=plt.cm.get_cmap('jet', 20),vmin=minvar, vmax=maxvar)
+        ax.axis("off") ; ax.axis("equal")
         
         # dont' show the original frame
         plt.close()
-         
-        self.anim = animation.FuncAnimation( self.anim_fig, self.animate, frames=self.anim_data.shape[0], interval=100 ) # interval in ms between frames
+        
+        def animate(i):
+            cax.set_array(data[i,:,:].values.flatten())
+            if 'iterations' in data.coords.variables:
+                ax.set_title("It = " + str(data.coords['iterations'].values[i])[:13])
+            else:
+                ax.set_title("Time = " + str(data.coords['time'].values[i])[:13])
+        
+        ani = animation.FuncAnimation( fig, animate, frames=data.shape[0], interval=100 ) # interval in ms between frames
+        
+        HTML(ani.to_html5_video())
+        
+        # optionally the animation can be saved in avi
+        if save:
+            ani.save(file.split('.')[0]+'-'+vari+'.mp4')
 
     ####################################################################################
     ####################################################################################
