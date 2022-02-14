@@ -1222,6 +1222,13 @@ class igm:
             os.path.join(self.config.working_dir, "PIE-COMPUTATIONAL.png"), pad_inches=0
         )
         plt.close("all")
+          
+    def animate(self,i):
+        self.anim_cax.set_array(self.anim_data[i,:,:].values.flatten())
+        if 'iterations' in self.anim_data.coords.variables:
+            self.anim_ax.set_title("It = " + str(self.anim_data.coords['iterations'].values[i])[:13])
+        else:
+            self.anim_ax.set_title("Time = " + str(self.anim_data.coords['time'].values[i])[:13])
          
     def animate_result(self,file,vari):
         
@@ -1247,20 +1254,13 @@ class igm:
         self.anim_fig, self.anim_ax = plt.subplots(figsize=(6,6*ratio),dpi=200)
         
         # Plot the initial frame. 
-        cax = self.anim_data [0,:,:].plot(add_colorbar=True,cmap=plt.cm.get_cmap('jet', 20),vmin=minvar, vmax=maxvar)
-        ax.axis("off") ; ax.axis("equal")
+        self.anim_cax = self.anim_data [0,:,:].plot(add_colorbar=True,cmap=plt.cm.get_cmap('jet', 20),vmin=minvar, vmax=maxvar)
+        self.anim_ax.axis("off") ; self.anim_ax.axis("equal")
         
         # dont' show the original frame
         plt.close()
-        
-        def animate(i):
-            cax.set_array(self.anim_data[i,:,:].values.flatten())
-            if 'iterations' in self.anim_data.coords.variables:
-                self.anim_ax.set_title("It = " + str(self.anim_data.coords['iterations'].values[i])[:13])
-            else:
-                self.anim_ax.set_title("Time = " + str(self.anim_data.coords['time'].values[i])[:13])
-        
-        return animation.FuncAnimation( self.anim_fig, animate, frames=self.anim_data.shape[0], interval=100 ) # interval in ms between frames
+         
+        self.anim = animation.FuncAnimation( self.anim_fig, self.animate, frames=self.anim_data.shape[0], interval=100 ) # interval in ms between frames
 
     ####################################################################################
     ####################################################################################
