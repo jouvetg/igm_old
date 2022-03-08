@@ -15,6 +15,7 @@ functions are sorted by thema, which are
 #      MASS BALANCE : Simple mass balance
 #      EROSION : Erosion law
 #      TRANSPORT : This handles the mass conservation
+#      3DVEL  : This permits to export reconsctruted 3D ice velocity field
 #      PLOT : Plotting functions
 #      PRINT INFO : handle the printing of output during computation
 #      RUN : the main function that wrap all functions within an time-iterative loop
@@ -1100,6 +1101,233 @@ class igm:
 
         ## Computation of the divergence, final shape is (ny,nx)
         return (Qx[:, 1:] - Qx[:, :-1]) / dx + (Qy[1:, :] - Qy[:-1, :]) / dy
+        
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+    #                               3DVEL
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+       
+    def read_config_param_3dvel(self):
+        
+        self.parser.add_argument('--vel3d_active', type=int, default=False,
+                         help='Is the computational of the 3D vel active?')
+    
+        self.parser.add_argument('--dz', type=int, default=20,
+                         help='Vertical discretization constant spacing')
+        
+        self.parser.add_argument('--maxthk', type=float, default=1000.0,
+                         help='Vertical maximum thickness')
+    
+    def init_3dvel(self):
+        
+        if self.config.vel3d_active:
+    
+            self.height = np.arange(0,self.config.maxthk+1,self.config.dz) # height with constant dz
+            self.ddz    = self.height[1:] - self.height[:-1]
+            
+            self.nz    = tf.Variable( tf.zeros(                        (  self.thk.shape[0], self.thk.shape[1] ) , dtype='int32'   ))
+            self.depth = tf.Variable( tf.zeros( ( self.height.shape[0],   self.thk.shape[0], self.thk.shape[1] ) , dtype='float32' ))
+            self.dz    = tf.Variable( tf.zeros( ( self.height.shape[0]-1, self.thk.shape[0], self.thk.shape[1] ) , dtype='float32' ))
+            
+            self.U = tf.Variable( tf.zeros_like(self.depth) ) # x-vel component
+            self.V = tf.Variable( tf.zeros_like(self.depth) ) # y-vel component
+            self.W = tf.Variable( tf.zeros_like(self.depth) ) # z-vel component
+     
+            self.tcomp["3d Vel"] = []
+
+    @tf.function()
+    def update_vert_disc_tf(self):
+         
+        # nz is the index of the first node above the ice surface
+        nz = tf.ones(self.thk.shape,'int32')*(self.height.shape[0]-1)
+        for k in range(self.height.shape[0]-1,-1,-1):
+            nz = tf.where( self.height[k] > self.thk , k , nz )  
+        self.nz.assign( tf.where( self.thk >= self.ddz[0] , nz , 1 ) )
+         
+        # depth is the depth of ice at any grid point, otherwise it is zero
+        depth=[]
+        for k in range(0,self.height.shape[0]):
+            depth.append( tf.where( (self.thk>=self.ddz[0])&(k<self.nz) , self.thk - self.height[k] , 0.0 ) )
+        self.depth.assign( tf.stack(depth,axis=0) )
+        
+        # dz is the  vertical spacing,
+        dz=[]
+        for k in range(0,self.height.shape[0]-1):
+            dz.append( tf.ones_like(self.thk) * self.ddz[k] )
+        self.dz.assign( tf.stack(dz,axis=0) )
+         
+    @tf.function()
+    def update_reconstruct_3dvel_tf(self):
+        
+        # Reconstruct the horizontal velocity field from basal and surface velocity assuming a SIA-like profile
+        fshear=[] ; U=[] ; V=[] ; W=[] ;
+
+        fshear.append( tf.zeros_like(self.thk) )
+
+        for k in range(1,self.height.shape[0]):
+            fshear.append( fshear[-1] + tf.where( k<self.nz ,self.dz[k-1], 0.0 )*(self.depth[k]**3) )            
+
+        norm = fshear[-1]
+        
+        for k in range(0,self.height.shape[0]):
+            fshear[k] /= tf.where(self.nz>1, norm, 1.0)
+             
+        for k in range(0,self.height.shape[0]):
+            U.append( self.uvelbase + fshear[k] * (self.uvelsurf - self.uvelbase) )
+            V.append( self.vvelbase + fshear[k] * (self.vvelsurf - self.vvelbase) ) 
+             
+        self.U.assign( tf.stack(U,axis=0) )
+        self.V.assign( tf.stack(V,axis=0) )
+        
+        Ui  = tf.pad(self.U, [[0, 0], [0, 0], [1, 1]], 'SYMMETRIC') 
+        Vj  = tf.pad(self.V, [[0, 0], [1, 1], [0, 0]], 'SYMMETRIC')
+        
+        ######### THis methods reconstruct the vertical velocity using divflux,
+        ######### and assuming a SIA-like profile like x- and y- components
+        
+        slopsurfx, slopsurfy = self.compute_gradient_tf( self.usurf, self.dx, self.dx )
+        sloptopgx, sloptopgy = self.compute_gradient_tf( self.topg,  self.dx, self.dx )
+        
+        divflux = self.compute_divflux(self.ubar, self.vbar, self.thk, self.dx, self.dx )
+        
+        self.wvelbase =             self.uvelbase * sloptopgx + self.vvelbase * sloptopgy 
+        self.wvelsurf = - divflux + self.uvelsurf * slopsurfx + self.vvelsurf * slopsurfy 
+        
+        for k in range(0,self.height.shape[0]):
+            W.append( self.wvelbase + fshear[k] * (self.wvelsurf - self.wvelbase) )
+            
+        self.W.assign( tf.stack(W,axis=0) )
+        
+        ### This methods integrates the imcompressiblity conditoons
+        
+        # W.append( tf.zeros_like(self.thk) )
+         
+        # for k in range(1,self.height.shape[0]):
+        #     W.append( W[-1] + tf.where( k<self.nz, \
+        #                                 self.dz[k-1] * ( - (Ui[k-1,:, 2:] - Ui[k-1,:,:-2]) / (2*self.dx) \
+        #                                                  - (Vj[k-1,2:, :] - Vj[k-1,:-2,:]) / (2*self.dx) ), \
+        #                                 0.0 ) 
+        #             )
+             
+        #self.W.assign( tf.stack(W,axis=0) )
+     
+    def update_3dvel(self):
+        
+        if self.config.vel3d_active:
+
+            if self.config.verbosity==1:
+                    print('update_3dvel ')        
+                    
+            self.tcomp["3d Vel"].append(time.time())
+     
+            self.update_vert_disc_tf() 
+    
+            self.update_reconstruct_3dvel_tf()
+            
+            self.update_ncdf_3d_ex()
+    
+            self.tcomp["3d Vel"][-1] -= time.time()
+            self.tcomp["3d Vel"][-1] *= -1
+
+    def update_ncdf_3d_ex(self, force=False):
+        """
+            Initialize  and write the ncdf output file
+        """
+  
+        if force | self.saveresult:
+ 
+            if self.it == 0:
+
+                if self.config.verbosity == 1:
+                    print("Initialize NCDF output Files")
+
+                nc = Dataset(
+                    os.path.join(self.config.working_dir, "ex3d.nc"),
+                    "w",
+                    format="NETCDF4",
+                )
+
+                nc.createDimension("time", None)
+                E = nc.createVariable("time", np.dtype("float32").char, ("time",))
+                E.units = "yr"
+                E.long_name = "time"
+                E.axis = "T"
+                E[0] = self.t.numpy()
+                
+                nc.createDimension('h',self.height.shape[0])
+                E = nc.createVariable('h',np.dtype('float32').char,('h',))
+                E.units = 'm'
+                E.long_name = 'h'
+                E.standard_name = 'h'
+                E.axis = 'H'
+                E[:] = self.height
+
+                nc.createDimension("y", len(self.y))
+                E = nc.createVariable("y", np.dtype("float32").char, ("y",))
+                E.units = "m"
+                E.long_name = "y"
+                E.axis = "Y"
+                E[:] = self.y.numpy()
+
+                nc.createDimension("x", len(self.x))
+                E = nc.createVariable("x", np.dtype("float32").char, ("x",))
+                E.units = "m"
+                E.long_name = "x"
+                E.axis = "X"
+                E[:] = self.x.numpy()
+
+                E = nc.createVariable('topg',np.dtype('float32').char,('time','y','x'))
+                E.units = 'm'
+                E.long_name = 'topg'
+                E.standard_name = 'topg' 
+                E[0,:,:] = self.topg.numpy()
+                
+                E = nc.createVariable('usurf',np.dtype('float32').char,('time','y','x'))
+                E.units = 'm'
+                E.long_name = 'usurf'
+                E.standard_name = 'usurf' 
+                E[0,:,:] = self.usurf.numpy()
+
+                E = nc.createVariable('U',np.dtype('float32').char,('time','h','y','x'))
+                E.units = 'm/y'
+                E.long_name = 'U'
+                E.standard_name = 'U' 
+                E[0,:,:,:] = self.U.numpy()
+                
+                E = nc.createVariable('V',np.dtype('float32').char,('time','h','y','x'))
+                E.units = 'm/y'
+                E.long_name = 'V'
+                E.standard_name = 'V' 
+                E[0,:,:,:] = self.V.numpy()
+                
+                E = nc.createVariable('W',np.dtype('float32').char,('time','h','y','x'))
+                E.units = 'm/y'
+                E.long_name = 'W'
+                E.standard_name = 'W' 
+                E[0,:,:,:] = self.W.numpy()
+
+                nc.close()
+
+            else:
+
+                nc = Dataset(
+                    os.path.join(self.config.working_dir, "ex3d.nc"),
+                    "a",
+                    format="NETCDF4",
+                )
+
+                d = nc.variables["time"][:].shape[0]
+                nc.variables["time"][d]        = self.t.numpy()
+                nc.variables['U'][d, :, :, :]  = self.U.numpy()
+                nc.variables['V'][d, :, :, :]  = self.V.numpy()
+                nc.variables['W'][d, :, :, :]  = self.W.numpy()
+                nc.variables['usurf'][d, :, :] = self.usurf.numpy()
+                nc.variables['topg'][d, :, :]  = self.topg.numpy()
+
+                nc.close()
 
     ####################################################################################
     ####################################################################################
@@ -1371,11 +1599,17 @@ class igm:
             
             self.update_ncdf_ts()
 
+            if self.config.vel3d_active:
+                self.init_3dvel()
+
             self.print_info()
 
             while self.t.numpy() < self.config.tend:
 
                 self.tcomp["All"].append(time.time())
+                
+                if self.config.vel3d_active:
+                    self.update_3dvel()
 
                 self.update_climate()
 
