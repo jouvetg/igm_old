@@ -227,6 +227,10 @@ class igm:
         # at this point, we should have defined at least x, y, usurf
         assert hasattr(self, "x")
         assert hasattr(self, "y")
+        
+        if hasattr(self, "usurfobs"):
+            self.usurf = tf.Variable(self.usurfobs)
+        
         assert hasattr(self, "usurf")
 
         if not hasattr(self, "thk"):
@@ -245,6 +249,12 @@ class igm:
 
         if not hasattr(self, "vvelsurf"):
             self.vvelsurf = tf.Variable(tf.zeros_like(self.thk))
+            
+        if not hasattr(self, "wvelbase"):
+            self.wvelbase = tf.Variable(tf.zeros_like(self.thk))
+
+        if not hasattr(self, "wvelsurf"):
+            self.wvelsurf = tf.Variable(tf.zeros_like(self.thk))
 
         if not hasattr(self, "smb"):
             if hasattr(self, "mb"):
@@ -257,6 +267,12 @@ class igm:
 
         if not hasattr(self, "strflowctrl"):
             self.strflowctrl = tf.Variable(tf.ones_like(self.thk) * self.config.init_strflowctrl)
+            
+        if not hasattr(self, "arrhenius"):
+            self.arrhenius = tf.Variable(tf.ones_like(self.thk) * self.config.init_arrhenius)
+            
+        if not hasattr(self, "slidingco"):
+            self.slidingco = tf.Variable(tf.ones_like(self.thk) * self.config.init_slidingco)
 
         self.X, self.Y = tf.meshgrid(self.x, self.y)
 
