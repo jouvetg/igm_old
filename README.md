@@ -17,7 +17,7 @@ The specificity of IGM is that it models the ice flow by a Convolutional Neural 
 
 IGM consists of an open-source Python code, which runs across both CPU and GPU and deals with two-dimensional gridded input and output data. Together with a companion library of ice flow emulators, IGM permits user-friendly, highly efficient, and mechanically state-of-the-art glacier simulations.
     
-# DocumentatiManuelon / Wiki
+# Manual / Wiki
 
 IGM's documentation is in construction in the [wiki](https://github.com/jouvetg/igm/wiki)
 
