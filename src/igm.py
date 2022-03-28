@@ -16,6 +16,7 @@ functions are sorted by thema, which are
 #      EROSION : Erosion law
 #      TRANSPORT : This handles the mass conservation
 #      3DVEL  : This permits to export reconsctruted 3D ice velocity field
+#      OPTI : All for the optimization / data assimilation
 #      PLOT : Plotting functions
 #      PRINT INFO : handle the printing of output during computation
 #      RUN : the main function that wrap all functions within an time-iterative loop
@@ -34,7 +35,9 @@ from netCDF4 import Dataset
 from scipy.interpolate import interp1d, CubicSpline, RectBivariateSpline, griddata
 import argparse
 from IPython.display import display, clear_output
- 
+from numpy import dtype
+from scipy import stats
+
 def str2bool(v):
     return v.lower() in ("true", "1")
 
@@ -52,7 +55,7 @@ class igm:
 
     def __init__(self):
         """
-            function build class IGM
+        function build class IGM
         """
         self.parser = argparse.ArgumentParser(description="IGM")
         self.read_config_param()
@@ -68,7 +71,7 @@ class igm:
         )
         self.parser.add_argument(
             "--resample", type=int, default=1, help="Upsample the data from geology.nc"
-        ) 
+        )
         self.parser.add_argument(
             "--tstart", type=float, default=0.0, help="Starting time"
         )
@@ -89,7 +92,10 @@ class igm:
             "--tsave", type=float, default=10, help="Save result each X years (10)"
         )
         self.parser.add_argument(
-            "--plot_result", type=str2bool, default=False, help="Plot results in png",
+            "--plot_result",
+            type=str2bool,
+            default=False,
+            help="Plot results in png",
         )
         self.parser.add_argument(
             "--plot_live",
@@ -110,16 +116,25 @@ class igm:
             help="experimental, just o get fair comp time, to be removed ....",
         )
         self.parser.add_argument(
-            "--init_strflowctrl", type=float, default=78, help="Initial strflowctrl",
+            "--init_strflowctrl",
+            type=float,
+            default=78,
+            help="Initial strflowctrl",
         )
 
         self.parser.add_argument(
-            "--init_slidingco", type=float, default=0, help="Initial slidingco",
-        )        
+            "--init_slidingco",
+            type=float,
+            default=0,
+            help="Initial slidingco",
+        )
         self.parser.add_argument(
-            "--init_arrhenius", type=float, default=78, help="Initial arrhenius",
-        )        
-        
+            "--init_arrhenius",
+            type=float,
+            default=78,
+            help="Initial arrhenius",
+        )
+
         self.parser.add_argument(
             "--optimize",
             type=str2bool,
@@ -141,7 +156,7 @@ class igm:
 
     def initialize(self):
         """
-            function initialize the strict minimum for IGM class, and record parameters
+        function initialize the strict minimum for IGM class, and record parameters
         """
 
         print(
@@ -183,7 +198,7 @@ class igm:
 
     def load_ncdf_data(self, filename):
         """
-            Load the geological input files from netcdf file
+        Load the geological input files from netcdf file
         """
         if self.config.verbosity == 1:
             print("LOAD NCDF file")
@@ -193,22 +208,22 @@ class igm:
         x = np.squeeze(nc.variables["x"]).astype("float32")
         y = np.squeeze(nc.variables["y"]).astype("float32")
         assert x[1] - x[0] == y[1] - y[0]
-        
+
         for var in nc.variables:
             if not var in ["x", "y"]:
                 vars()[var] = np.squeeze(nc.variables[var]).astype("float32")
-                vars()[var] = np.where(vars()[var] >10**35, np.nan, vars()[var])
-                
-        if self.config.resample>1:
-            xx = x[::self.config.resample]
-            yy = y[::self.config.resample]
+                vars()[var] = np.where(vars()[var] > 10 ** 35, np.nan, vars()[var])
+
+        if self.config.resample > 1:
+            xx = x[:: self.config.resample]
+            yy = y[:: self.config.resample]
             for var in nc.variables:
                 if not var in ["x", "y"]:
-                    vars()[var]  = RectBivariateSpline(y, x, vars()[var])(yy,xx) 
+                    vars()[var] = RectBivariateSpline(y, x, vars()[var])(yy, xx)
             x = xx
             y = yy
-    
-        for var in nc.variables: 
+
+        for var in nc.variables:
             if var in ["x", "y"]:
                 vars(self)[var] = tf.constant(vars()[var].astype("float32"))
             else:
@@ -218,7 +233,7 @@ class igm:
 
     def initialize_fields(self):
         """
-            Initialize fields, complete the loading of geology
+        Initialize fields, complete the loading of geology
         """
 
         if self.config.verbosity == 1:
@@ -227,10 +242,10 @@ class igm:
         # at this point, we should have defined at least x, y, usurf
         assert hasattr(self, "x")
         assert hasattr(self, "y")
-        
+
         if hasattr(self, "usurfobs"):
             self.usurf = tf.Variable(self.usurfobs)
-        
+
         assert hasattr(self, "usurf")
 
         if not hasattr(self, "thk"):
@@ -249,7 +264,7 @@ class igm:
 
         if not hasattr(self, "vvelsurf"):
             self.vvelsurf = tf.Variable(tf.zeros_like(self.thk))
-            
+
         if not hasattr(self, "wvelbase"):
             self.wvelbase = tf.Variable(tf.zeros_like(self.thk))
 
@@ -266,13 +281,19 @@ class igm:
             self.dhdt = tf.Variable(tf.zeros_like(self.thk))
 
         if not hasattr(self, "strflowctrl"):
-            self.strflowctrl = tf.Variable(tf.ones_like(self.thk) * self.config.init_strflowctrl)
-            
+            self.strflowctrl = tf.Variable(
+                tf.ones_like(self.thk) * self.config.init_strflowctrl
+            )
+
         if not hasattr(self, "arrhenius"):
-            self.arrhenius = tf.Variable(tf.ones_like(self.thk) * self.config.init_arrhenius)
-            
+            self.arrhenius = tf.Variable(
+                tf.ones_like(self.thk) * self.config.init_arrhenius
+            )
+
         if not hasattr(self, "slidingco"):
-            self.slidingco = tf.Variable(tf.ones_like(self.thk) * self.config.init_slidingco)
+            self.slidingco = tf.Variable(
+                tf.ones_like(self.thk) * self.config.init_slidingco
+            )
 
         self.X, self.Y = tf.meshgrid(self.x, self.y)
 
@@ -304,7 +325,10 @@ class igm:
         self.var_info["vvelbase"] = ["y basal velocity of ice", "m/y"]
         self.var_info["velbase_mag"] = ["Basal velocity magnitude of ice", "m/y"]
         self.var_info["divflux"] = ["Divergence of the ice flux", "m/y"]
-        self.var_info["strflowctrl"] = ["arrhenius + 10 * slidingco", "MPa$^{-3}$ a$^{-1}$"]
+        self.var_info["strflowctrl"] = [
+            "arrhenius + 10 * slidingco",
+            "MPa$^{-3}$ a$^{-1}$",
+        ]
         self.var_info["arrhenius"] = ["Arrhenius factor", "MPa$^{-3}$ a$^{-1}$"]
         self.var_info["slidingco"] = ["Sliding Coefficient", "km MPa$^{-3}$ a$^{-1}$"]
         self.var_info["meantemp"] = ["Mean anual surface temperatures", "°C"]
@@ -319,7 +343,7 @@ class igm:
 
     def restart(self):
         """
-            Permit to restart a simulation from a ncdf file y taking the last iterate
+        Permit to restart a simulation from a ncdf file y taking the last iterate
         """
         if self.config.verbosity == 1:
             print("READ RESTARTING FILE, OVERIDE FIELDS WHEN GIVEN")
@@ -342,7 +366,7 @@ class igm:
 
     def stop(self):
         """
-            this is a dummy stop that serves to syncrohnize CPU and GPU for reliable computational times
+        this is a dummy stop that serves to syncrohnize CPU and GPU for reliable computational times
         """
         ubar_np = self.ubar.numpy()
         thk_np = self.thk.numpy()
@@ -378,7 +402,7 @@ class igm:
 
     def update_ncdf_ex(self, force=False):
         """
-            Initialize  and write the ncdf output file
+        Initialize  and write the ncdf output file
         """
 
         if not hasattr(self, "already_called_update_ncdf_ex"):
@@ -465,19 +489,19 @@ class igm:
 
             self.tcomp["Outputs ncdf"][-1] -= time.time()
             self.tcomp["Outputs ncdf"][-1] *= -1
-            
+
     def update_ncdf_ts(self, force=False):
         """
-            Initialize  and write the ncdf time serie file
+        Initialize  and write the ncdf time serie file
         """
 
         if not hasattr(self, "already_called_update_ncdf_ts"):
             self.already_called_update_ncdf_ts = True
 
         if force | self.saveresult:
-             
-            vol  = np.sum(self.thk)   * (self.dx ** 2) / 10 ** 9
-            area = np.sum(self.thk>1) * (self.dx ** 2) / 10 ** 6
+
+            vol = np.sum(self.thk) * (self.dx ** 2) / 10 ** 9
+            area = np.sum(self.thk > 1) * (self.dx ** 2) / 10 ** 6
 
             if self.it == 0:
 
@@ -497,8 +521,8 @@ class igm:
                 E.axis = "T"
                 E[0] = self.t.numpy()
 
-                for var in ['vol','area']:
-                    E = nc.createVariable( var, np.dtype("float32").char, ("time") )
+                for var in ["vol", "area"]:
+                    E = nc.createVariable(var, np.dtype("float32").char, ("time"))
                     E[0] = vars()[var].numpy()
                     E.long_name = self.var_info[var][0]
                     E.units = self.var_info[var][1]
@@ -506,11 +530,15 @@ class igm:
 
             else:
 
-                nc = Dataset( os.path.join(self.config.working_dir, "ts.nc"), "a", format="NETCDF4" )
+                nc = Dataset(
+                    os.path.join(self.config.working_dir, "ts.nc"),
+                    "a",
+                    format="NETCDF4",
+                )
                 d = nc.variables["time"][:].shape[0]
 
                 nc.variables["time"][d] = self.t.numpy()
-                for var in ['vol','area']:
+                for var in ["vol", "area"]:
                     nc.variables[var][d] = vars()[var].numpy()
                 nc.close()
 
@@ -537,7 +565,7 @@ class igm:
 
     def update_t_dt(self):
         """
-            compute time step to satisfy the CLF condition and hit requested saving times
+        compute time step to satisfy the CLF condition and hit requested saving times
         """
         if self.config.verbosity == 1:
             print("Update DT from the CFL condition at time : ", self.t.numpy())
@@ -567,11 +595,11 @@ class igm:
 
         if self.tsave[self.itsave + 1] <= self.t.numpy() + self.dt:
             self.dt = self.tsave[self.itsave + 1] - self.t.numpy()
-            self.t.assign( self.tsave[self.itsave + 1] )
+            self.t.assign(self.tsave[self.itsave + 1])
             self.saveresult = True
             self.itsave += 1
         else:
-            self.t.assign( self.t.numpy() + self.dt )
+            self.t.assign(self.t.numpy() + self.dt)
             self.saveresult = False
 
         self.it += 1
@@ -590,7 +618,7 @@ class igm:
     @tf.function()
     def getmag(self, u, v):
         """
-            return the norm of a 2D vector, e.g. to compute velbase_mag
+        return the norm of a 2D vector, e.g. to compute velbase_mag
         """
         return tf.norm(
             tf.concat([tf.expand_dims(u, axis=-1), tf.expand_dims(v, axis=-1)], axis=2),
@@ -600,7 +628,7 @@ class igm:
     @tf.function()
     def compute_gradient_tf(self, s, dx, dy):
         """
-            compute spatial 2D gradient of a given field
+        compute spatial 2D gradient of a given field
         """
 
         EX = tf.concat([s[:, 0:1], 0.5 * (s[:, :-1] + s[:, 1:]), s[:, -1:]], 1)
@@ -621,7 +649,7 @@ class igm:
 
     def read_fields_and_bounds(self, path):
         """
-            get fields (input and outputs) from given file
+        get fields (input and outputs) from given file
         """
 
         fieldbounds = {}
@@ -641,8 +669,8 @@ class igm:
             fieldout.append(part[0])
             fieldbounds[part[0]] = float(part[1])
         fid.close()
-        
-        return fieldin,fieldout,fieldbounds
+
+        return fieldin, fieldout, fieldbounds
 
     def read_config_param_iceflow(self):
 
@@ -667,23 +695,25 @@ class igm:
 
     def initialize_iceflow(self):
         """
-            set-up the iceflow emulator
+        set-up the iceflow emulator
         """
- 
+
         dirpath = os.path.join(self.config.iceflow_model_lib_path, str(int(self.dx)))
-     
+
         assert os.path.isdir(dirpath)
-        
-        fieldin,fieldout,fieldbounds = self.read_fields_and_bounds(dirpath)
+
+        fieldin, fieldout, fieldbounds = self.read_fields_and_bounds(dirpath)
 
         self.iceflow_mapping = {}
-        self.iceflow_mapping["fieldin"]  = fieldin
+        self.iceflow_mapping["fieldin"] = fieldin
         self.iceflow_mapping["fieldout"] = fieldout
-        self.iceflow_fieldbounds         = fieldbounds
+        self.iceflow_fieldbounds = fieldbounds
 
-        self.iceflow_model = tf.keras.models.load_model( os.path.join(dirpath, "model.h5") )
+        self.iceflow_model = tf.keras.models.load_model(
+            os.path.join(dirpath, "model.h5")
+        )
 
-#        print(self.iceflow_model.summary())
+        #        print(self.iceflow_model.summary())
 
         Ny = self.thk.shape[0]
         Nx = self.thk.shape[1]
@@ -703,7 +733,7 @@ class igm:
 
     def update_iceflow(self):
         """
-            function update the ice flow using the neural network emulator
+        function update the ice flow using the neural network emulator
         """
 
         if self.config.verbosity == 1:
@@ -714,7 +744,8 @@ class igm:
         X = tf.expand_dims(
             tf.stack(
                 [
-                    tf.pad(vars(self)[f], self.PAD, "CONSTANT") / self.iceflow_fieldbounds[f]
+                    tf.pad(vars(self)[f], self.PAD, "CONSTANT")
+                    / self.iceflow_fieldbounds[f]
                     for f in self.iceflow_mapping["fieldin"]
                 ],
                 axis=-1,
@@ -727,26 +758,29 @@ class igm:
         Ny, Nx = self.thk.shape
         for kk, f in enumerate(self.iceflow_mapping["fieldout"]):
             vars(self)[f].assign(
-                tf.where(self.thk > 0, Y[0, :Ny, :Nx, kk], 0) * self.iceflow_fieldbounds[f]
+                tf.where(self.thk > 0, Y[0, :Ny, :Nx, kk], 0)
+                * self.iceflow_fieldbounds[f]
             )
-         
-        if (self.config.force_max_velbar>0):
-        
+
+        if self.config.force_max_velbar > 0:
+
             self.velbar_mag = self.getmag(self.ubar, self.vbar)
-            
-            self.ubar.assign( 
-              tf.where( self.velbar_mag >= self.config.force_max_velbar,
-                        self.config.force_max_velbar * ( self.ubar / self.velbar_mag ),
-                        self.ubar
-                      )
-                            )
-            self.vbar.assign( 
-              tf.where( self.velbar_mag >= self.config.force_max_velbar,
-                        self.config.force_max_velbar * ( self.vbar / self.velbar_mag ),
-                        self.vbar
-                      )
-                            )
-                     
+
+            self.ubar.assign(
+                tf.where(
+                    self.velbar_mag >= self.config.force_max_velbar,
+                    self.config.force_max_velbar * (self.ubar / self.velbar_mag),
+                    self.ubar,
+                )
+            )
+            self.vbar.assign(
+                tf.where(
+                    self.velbar_mag >= self.config.force_max_velbar,
+                    self.config.force_max_velbar * (self.vbar / self.velbar_mag),
+                    self.vbar,
+                )
+            )
+
         self.tcomp["Ice flow"][-1] -= time.time()
         self.tcomp["Ice flow"][-1] *= -1
 
@@ -768,12 +802,15 @@ class igm:
             help="Update the climate each X years (1)",
         )
         self.parser.add_argument(
-            "--type_climate", type=str, default="", help="toy or any custom climate",
+            "--type_climate",
+            type=str,
+            default="",
+            help="toy or any custom climate",
         )
 
     def update_climate(self, force=False):
         """
-            compute climate at time t
+        compute climate at time t
         """
 
         if len(self.config.type_climate) > 0:
@@ -785,7 +822,9 @@ class igm:
                 self.tcomp["Climate"] = []
                 self.already_called_update_climate = True
 
-            new_clim_needed = (self.t.numpy() - self.tlast_clim) >= self.config.clim_update_freq
+            new_clim_needed = (
+                self.t.numpy() - self.tlast_clim
+            ) >= self.config.clim_update_freq
 
             if force | new_clim_needed:
 
@@ -824,10 +863,7 @@ class igm:
             help="zero, simple, given",
         )
         self.parser.add_argument(
-            "--mb_scaling", 
-            type=float, 
-            default=1.0, 
-            help="mass balance scaling"
+            "--mb_scaling", type=float, default=1.0, help="mass balance scaling"
         )
         self.parser.add_argument(
             "--mb_simple_file",
@@ -844,7 +880,7 @@ class igm:
 
     def init_smb_simple(self):
         """
-            initialize simple mass balance
+        initialize simple mass balance
         """
         param = np.loadtxt(
             os.path.join(self.config.working_dir, self.config.mb_simple_file),
@@ -879,7 +915,7 @@ class igm:
 
     def update_smb_simple(self):
         """
-            mass balance 'simple' parametrized by ELA, ablation and accumulation gradients, and max acuumulation
+        mass balance 'simple' parametrized by ELA, ablation and accumulation gradients, and max acuumulation
         """
 
         ela = np.float32(self.ela(self.t))
@@ -893,43 +929,43 @@ class igm:
         smb = tf.where(self.icemask > 0.5, smb, -10)
 
         self.smb.assign(smb)
-         
+
     def init_smb_nn(self):
         """
-            set-up the smb nn emulator
+        set-up the smb nn emulator
         """
- 
+
         dirpath = os.path.join(self.config.smb_model_lib_path, str(int(self.dx)))
-     
+
         assert os.path.isdir(dirpath)
-        
-        fieldin,fieldout,fieldbounds = self.read_fields_and_bounds(dirpath)
-        
+
+        fieldin, fieldout, fieldbounds = self.read_fields_and_bounds(dirpath)
+
         self.read_fields_and_bounds(dirpath)
 
-        self.smb_mapping             = {}
-        self.smb_mapping["fieldin"]  = fieldin
+        self.smb_mapping = {}
+        self.smb_mapping["fieldin"] = fieldin
         self.smb_mapping["fieldout"] = fieldout
-        self.smb_fieldbounds         = fieldbounds
+        self.smb_fieldbounds = fieldbounds
 
-        self.smb_model = tf.keras.models.load_model( os.path.join(dirpath, "model.h5") )
+        self.smb_model = tf.keras.models.load_model(os.path.join(dirpath, "model.h5"))
 
     def update_smb_nn(self):
         """
-            function update the smb using the neural network emulator
+        function update the smb using the neural network emulator
         """
 
         # this is not a nice implementation, but for now, it does the job
         self.mask = tf.ones_like(self.thk)
         for i in range(12):
-            vars(self)['air_temp_'+str(i)]      = self.air_temp[i]
-            vars(self)['precipitation_'+str(i)] = self.precipitation[i]
+            vars(self)["air_temp_" + str(i)] = self.air_temp[i]
+            vars(self)["precipitation_" + str(i)] = self.precipitation[i]
 
         X = tf.expand_dims(
             tf.stack(
-                [ 
-                    vars(self)[f] / self.smb_fieldbounds[f] 
-                    for f in self.smb_mapping["fieldin"] 
+                [
+                    vars(self)[f] / self.smb_fieldbounds[f]
+                    for f in self.smb_mapping["fieldin"]
                 ],
                 axis=-1,
             ),
@@ -937,14 +973,14 @@ class igm:
         )
 
         Y = self.smb_model.predict_on_batch(X)
-        
+
         # this will return the smb, the only output of the smb nn emulator
         for kk, f in enumerate(self.smb_mapping["fieldout"]):
-            vars(self)[f].assign( Y[0, :, :, kk] * self.smb_fieldbounds[f] )  
+            vars(self)[f].assign(Y[0, :, :, kk] * self.smb_fieldbounds[f])
 
     def update_smb(self, force=False):
         """
-            update_mass balance
+        update_mass balance
         """
 
         if not hasattr(self, "already_called_update_smb"):
@@ -952,7 +988,7 @@ class igm:
             self.tcomp["Mass balance"] = []
             if len(self.config.type_mass_balance) > 0:
                 if hasattr(self, "init_smb_" + self.config.type_mass_balance):
-                     getattr(self, "init_smb_" + self.config.type_mass_balance)()
+                    getattr(self, "init_smb_" + self.config.type_mass_balance)()
             self.already_called_update_smb = True
 
         if (force) | ((self.t.numpy() - self.tlast_mb) >= self.config.mb_update_freq):
@@ -980,7 +1016,7 @@ class igm:
 
             self.tcomp["Mass balance"][-1] -= time.time()
             self.tcomp["Mass balance"][-1] *= -1
-            
+
     ####################################################################################
     ####################################################################################
     ####################################################################################
@@ -988,9 +1024,9 @@ class igm:
     ####################################################################################
     ####################################################################################
     ####################################################################################
-    
+
     def read_config_param_erosion(self):
-         
+
         self.parser.add_argument(
             "--erosion_include",
             type=str2bool,
@@ -1000,7 +1036,7 @@ class igm:
         self.parser.add_argument(
             "--erosion_cst",
             type=float,
-            default=5.2*10**(-11),
+            default=5.2 * 10 ** (-11),
             help="from Koppes et al., 2015, unit is (m/y)**(1-l)",
         )
         self.parser.add_argument(
@@ -1015,43 +1051,46 @@ class igm:
             default=100,
             help="Update the erosion only each 100 years",
         )
-    
+
     def update_topg(self):
         """
-            update bedrock due to glacial errosion,
-            eroson rate are proportional to a power
-            of the sliding velocity magnitude
+        update bedrock due to glacial errosion,
+        eroson rate are proportional to a power
+        of the sliding velocity magnitude
         """
-        
+
         if self.config.erosion_include:
-            
-            if not hasattr(self,'already_called_update_topg'):
-                self.tlast_erosion    = self.config.tstart
+
+            if not hasattr(self, "already_called_update_topg"):
+                self.tlast_erosion = self.config.tstart
                 self.tcomp["Erosion"] = []
                 self.already_called_update_topg = True
-                
-            if ((self.t - self.tlast_erosion) >= self.config.erosion_update_freq):
-    
+
+            if (self.t - self.tlast_erosion) >= self.config.erosion_update_freq:
+
                 if self.config.verbosity == 1:
                     print("Erode bedrock at time : ", self.t)
-                    
-                self.tcomp["Erosion"].append(time.time()) 
-                                
-                self.velbase_mag = self.getmag(self.uvelbase, self.vvelbase)
-                
-                dtopg = (self.t - self.tlast_erosion) * self.config.erosion_cst \
-                                                      * (self.velbase_mag**self.config.erosion_exp)
-          
-                self.topg.assign( self.topg - dtopg )
-    
-#                print('max erosion is :', np.max( np.abs ( dtopg ) ) )
 
-                self.usurf.assign( self.topg + self.thk )
-                
+                self.tcomp["Erosion"].append(time.time())
+
+                self.velbase_mag = self.getmag(self.uvelbase, self.vvelbase)
+
+                dtopg = (
+                    (self.t - self.tlast_erosion)
+                    * self.config.erosion_cst
+                    * (self.velbase_mag ** self.config.erosion_exp)
+                )
+
+                self.topg.assign(self.topg - dtopg)
+
+                #                print('max erosion is :', np.max( np.abs ( dtopg ) ) )
+
+                self.usurf.assign(self.topg + self.thk)
+
                 self.tlast_erosion = self.t
-                
+
                 self.tcomp["Erosion"][-1] -= time.time()
-                self.tcomp["Erosion"][-1] *= -1 
+                self.tcomp["Erosion"][-1] *= -1
 
     ####################################################################################
     ####################################################################################
@@ -1063,8 +1102,8 @@ class igm:
 
     def update_thk(self):
         """
-            update ice thickness solving dh/dt + d(u h)/dx + d(v h)/dy = f using 
-            upwind finite volume, update usurf and slopes
+        update ice thickness solving dh/dt + d(u h)/dx + d(v h)/dy = f using
+        upwind finite volume, update usurf and slopes
         """
 
         if not hasattr(self, "already_called_update_icethickness"):
@@ -1102,22 +1141,26 @@ class igm:
         #   Third, one compute the flux on the staggered grid slecting upwind quantities
         #   Last, computing the divergence on the staggered grid yields values def on the original grid
         """
-        
+
         ## Compute u and v on the staggered grid
-        u = tf.concat([u[:, 0:1], 0.5 * (u[:, :-1] + u[:, 1:]), u[:, -1:]], 1) # has shape (ny,nx+1)
-        v = tf.concat([v[0:1, :], 0.5 * (v[:-1, :] + v[1:, :]), v[-1:, :]], 0) # has shape (ny+1,nx)
+        u = tf.concat(
+            [u[:, 0:1], 0.5 * (u[:, :-1] + u[:, 1:]), u[:, -1:]], 1
+        )  # has shape (ny,nx+1)
+        v = tf.concat(
+            [v[0:1, :], 0.5 * (v[:-1, :] + v[1:, :]), v[-1:, :]], 0
+        )  # has shape (ny+1,nx)
 
         # Extend h with constant value at the domain boundaries
-        Hx = tf.pad(h, [[0, 0], [1, 1]], "CONSTANT")    # has shape (ny,nx+2)
-        Hy = tf.pad(h, [[1, 1], [0, 0]], "CONSTANT")    # has shape (ny+2,nx)
+        Hx = tf.pad(h, [[0, 0], [1, 1]], "CONSTANT")  # has shape (ny,nx+2)
+        Hy = tf.pad(h, [[1, 1], [0, 0]], "CONSTANT")  # has shape (ny+2,nx)
 
         ## Compute fluxes by selcting the upwind quantities
-        Qx = u * tf.where(u > 0, Hx[:, :-1], Hx[:, 1:]) # has shape (ny,nx+1)
-        Qy = v * tf.where(v > 0, Hy[:-1, :], Hy[1:, :]) # has shape (ny+1,nx)
+        Qx = u * tf.where(u > 0, Hx[:, :-1], Hx[:, 1:])  # has shape (ny,nx+1)
+        Qy = v * tf.where(v > 0, Hy[:-1, :], Hy[1:, :])  # has shape (ny+1,nx)
 
         ## Computation of the divergence, final shape is (ny,nx)
         return (Qx[:, 1:] - Qx[:, :-1]) / dx + (Qy[1:, :] - Qy[:-1, :]) / dy
-        
+
     ####################################################################################
     ####################################################################################
     ####################################################################################
@@ -1125,136 +1168,171 @@ class igm:
     ####################################################################################
     ####################################################################################
     ####################################################################################
-       
+
     def read_config_param_3dvel(self):
-        
-        self.parser.add_argument('--vel3d_active', type=int, default=False,
-                         help='Is the computational of the 3D vel active?')
-    
-        self.parser.add_argument('--dz', type=int, default=20,
-                         help='Vertical discretization constant spacing')
-        
-        self.parser.add_argument('--maxthk', type=float, default=1000.0,
-                         help='Vertical maximum thickness')
-    
+
+        self.parser.add_argument(
+            "--vel3d_active",
+            type=int,
+            default=False,
+            help="Is the computational of the 3D vel active?",
+        )
+
+        self.parser.add_argument(
+            "--dz",
+            type=int,
+            default=20,
+            help="Vertical discretization constant spacing",
+        )
+
+        self.parser.add_argument(
+            "--maxthk", type=float, default=1000.0, help="Vertical maximum thickness"
+        )
+
     def init_3dvel(self):
-        
+
         if self.config.vel3d_active:
-    
-            self.height = np.arange(0,self.config.maxthk+1,self.config.dz) # height with constant dz
-            self.ddz    = self.height[1:] - self.height[:-1]
-            
-            self.nz    = tf.Variable( tf.zeros(                        (  self.thk.shape[0], self.thk.shape[1] ) , dtype='int32'   ))
-            self.depth = tf.Variable( tf.zeros( ( self.height.shape[0],   self.thk.shape[0], self.thk.shape[1] ) , dtype='float32' ))
-            self.dz    = tf.Variable( tf.zeros( ( self.height.shape[0]-1, self.thk.shape[0], self.thk.shape[1] ) , dtype='float32' ))
-            
-            self.U = tf.Variable( tf.zeros_like(self.depth) ) # x-vel component
-            self.V = tf.Variable( tf.zeros_like(self.depth) ) # y-vel component
-            self.W = tf.Variable( tf.zeros_like(self.depth) ) # z-vel component
-     
+
+            self.height = np.arange(
+                0, self.config.maxthk + 1, self.config.dz
+            )  # height with constant dz
+            self.ddz = self.height[1:] - self.height[:-1]
+
+            self.nz = tf.Variable(
+                tf.zeros((self.thk.shape[0], self.thk.shape[1]), dtype="int32")
+            )
+            self.depth = tf.Variable(
+                tf.zeros(
+                    (self.height.shape[0], self.thk.shape[0], self.thk.shape[1]),
+                    dtype="float32",
+                )
+            )
+            self.dz = tf.Variable(
+                tf.zeros(
+                    (self.height.shape[0] - 1, self.thk.shape[0], self.thk.shape[1]),
+                    dtype="float32",
+                )
+            )
+
+            self.U = tf.Variable(tf.zeros_like(self.depth))  # x-vel component
+            self.V = tf.Variable(tf.zeros_like(self.depth))  # y-vel component
+            self.W = tf.Variable(tf.zeros_like(self.depth))  # z-vel component
+
             self.tcomp["3d Vel"] = []
 
     @tf.function()
     def update_vert_disc_tf(self):
-         
+
         # nz is the index of the first node above the ice surface
-        nz = tf.ones(self.thk.shape,'int32')*(self.height.shape[0]-1)
-        for k in range(self.height.shape[0]-1,-1,-1):
-            nz = tf.where( self.height[k] > self.thk , k , nz )  
-        self.nz.assign( tf.where( self.thk >= self.ddz[0] , nz , 1 ) )
-         
+        nz = tf.ones(self.thk.shape, "int32") * (self.height.shape[0] - 1)
+        for k in range(self.height.shape[0] - 1, -1, -1):
+            nz = tf.where(self.height[k] > self.thk, k, nz)
+        self.nz.assign(tf.where(self.thk >= self.ddz[0], nz, 1))
+
         # depth is the depth of ice at any grid point, otherwise it is zero
-        depth=[]
-        for k in range(0,self.height.shape[0]):
-            depth.append( tf.where( (self.thk>=self.ddz[0])&(k<self.nz) , self.thk - self.height[k] , 0.0 ) )
-        self.depth.assign( tf.stack(depth,axis=0) )
-        
+        depth = []
+        for k in range(0, self.height.shape[0]):
+            depth.append(
+                tf.where(
+                    (self.thk >= self.ddz[0]) & (k < self.nz),
+                    self.thk - self.height[k],
+                    0.0,
+                )
+            )
+        self.depth.assign(tf.stack(depth, axis=0))
+
         # dz is the  vertical spacing,
-        dz=[]
-        for k in range(0,self.height.shape[0]-1):
-            dz.append( tf.ones_like(self.thk) * self.ddz[k] )
-        self.dz.assign( tf.stack(dz,axis=0) )
-         
+        dz = []
+        for k in range(0, self.height.shape[0] - 1):
+            dz.append(tf.ones_like(self.thk) * self.ddz[k])
+        self.dz.assign(tf.stack(dz, axis=0))
+
     @tf.function()
     def update_reconstruct_3dvel_tf(self):
-        
+
         # Reconstruct the horizontal velocity field from basal and surface velocity assuming a SIA-like profile
-        fshear=[] ; U=[] ; V=[] ; W=[] ;
+        fshear = []
+        U = []
+        V = []
+        W = []
 
-        fshear.append( tf.zeros_like(self.thk) )
+        fshear.append(tf.zeros_like(self.thk))
 
-        for k in range(1,self.height.shape[0]):
-            fshear.append( fshear[-1] + tf.where( k<self.nz ,self.dz[k-1], 0.0 )*(self.depth[k]**3) )            
+        for k in range(1, self.height.shape[0]):
+            fshear.append(
+                fshear[-1]
+                + tf.where(k < self.nz, self.dz[k - 1], 0.0) * (self.depth[k] ** 3)
+            )
 
         norm = fshear[-1]
-        
-        for k in range(0,self.height.shape[0]):
-            fshear[k] /= tf.where(self.nz>1, norm, 1.0)
-             
-        for k in range(0,self.height.shape[0]):
-            U.append( self.uvelbase + fshear[k] * (self.uvelsurf - self.uvelbase) )
-            V.append( self.vvelbase + fshear[k] * (self.vvelsurf - self.vvelbase) ) 
-             
-        self.U.assign( tf.stack(U,axis=0) )
-        self.V.assign( tf.stack(V,axis=0) )
-        
-        Ui  = tf.pad(self.U, [[0, 0], [0, 0], [1, 1]], 'SYMMETRIC') 
-        Vj  = tf.pad(self.V, [[0, 0], [1, 1], [0, 0]], 'SYMMETRIC')
-        
+
+        for k in range(0, self.height.shape[0]):
+            fshear[k] /= tf.where(self.nz > 1, norm, 1.0)
+
+        for k in range(0, self.height.shape[0]):
+            U.append(self.uvelbase + fshear[k] * (self.uvelsurf - self.uvelbase))
+            V.append(self.vvelbase + fshear[k] * (self.vvelsurf - self.vvelbase))
+
+        self.U.assign(tf.stack(U, axis=0))
+        self.V.assign(tf.stack(V, axis=0))
+
+        Ui = tf.pad(self.U, [[0, 0], [0, 0], [1, 1]], "SYMMETRIC")
+        Vj = tf.pad(self.V, [[0, 0], [1, 1], [0, 0]], "SYMMETRIC")
+
         ######### THis methods reconstruct the vertical velocity using divflux,
         ######### and assuming a SIA-like profile like x- and y- components
-        
-        slopsurfx, slopsurfy = self.compute_gradient_tf( self.usurf, self.dx, self.dx )
-        sloptopgx, sloptopgy = self.compute_gradient_tf( self.topg,  self.dx, self.dx )
-        
-        divflux = self.compute_divflux(self.ubar, self.vbar, self.thk, self.dx, self.dx )
-        
-        self.wvelbase =             self.uvelbase * sloptopgx + self.vvelbase * sloptopgy 
-        self.wvelsurf = - divflux + self.uvelsurf * slopsurfx + self.vvelsurf * slopsurfy 
-        
-        for k in range(0,self.height.shape[0]):
-            W.append( self.wvelbase + fshear[k] * (self.wvelsurf - self.wvelbase) )
-            
-        self.W.assign( tf.stack(W,axis=0) )
-        
+
+        slopsurfx, slopsurfy = self.compute_gradient_tf(self.usurf, self.dx, self.dx)
+        sloptopgx, sloptopgy = self.compute_gradient_tf(self.topg, self.dx, self.dx)
+
+        divflux = self.compute_divflux(self.ubar, self.vbar, self.thk, self.dx, self.dx)
+
+        self.wvelbase = self.uvelbase * sloptopgx + self.vvelbase * sloptopgy
+        self.wvelsurf = -divflux + self.uvelsurf * slopsurfx + self.vvelsurf * slopsurfy
+
+        for k in range(0, self.height.shape[0]):
+            W.append(self.wvelbase + fshear[k] * (self.wvelsurf - self.wvelbase))
+
+        self.W.assign(tf.stack(W, axis=0))
+
         ### This methods integrates the imcompressiblity conditoons
-        
+
         # W.append( tf.zeros_like(self.thk) )
-         
+
         # for k in range(1,self.height.shape[0]):
         #     W.append( W[-1] + tf.where( k<self.nz, \
         #                                 self.dz[k-1] * ( - (Ui[k-1,:, 2:] - Ui[k-1,:,:-2]) / (2*self.dx) \
         #                                                  - (Vj[k-1,2:, :] - Vj[k-1,:-2,:]) / (2*self.dx) ), \
-        #                                 0.0 ) 
+        #                                 0.0 )
         #             )
-             
-        #self.W.assign( tf.stack(W,axis=0) )
-     
+
+        # self.W.assign( tf.stack(W,axis=0) )
+
     def update_3dvel(self):
-        
+
         if self.config.vel3d_active:
 
-            if self.config.verbosity==1:
-                    print('update_3dvel ')        
-                    
+            if self.config.verbosity == 1:
+                print("update_3dvel ")
+
             self.tcomp["3d Vel"].append(time.time())
-     
-            self.update_vert_disc_tf() 
-    
+
+            self.update_vert_disc_tf()
+
             self.update_reconstruct_3dvel_tf()
-            
+
             self.update_ncdf_3d_ex()
-    
+
             self.tcomp["3d Vel"][-1] -= time.time()
             self.tcomp["3d Vel"][-1] *= -1
 
     def update_ncdf_3d_ex(self, force=False):
         """
-            Initialize  and write the ncdf output file
+        Initialize  and write the ncdf output file
         """
-  
+
         if force | self.saveresult:
- 
+
             if self.it == 0:
 
                 if self.config.verbosity == 1:
@@ -1272,13 +1350,13 @@ class igm:
                 E.long_name = "time"
                 E.axis = "T"
                 E[0] = self.t.numpy()
-                
-                nc.createDimension('h',self.height.shape[0])
-                E = nc.createVariable('h',np.dtype('float32').char,('h',))
-                E.units = 'm'
-                E.long_name = 'h'
-                E.standard_name = 'h'
-                E.axis = 'H'
+
+                nc.createDimension("h", self.height.shape[0])
+                E = nc.createVariable("h", np.dtype("float32").char, ("h",))
+                E.units = "m"
+                E.long_name = "h"
+                E.standard_name = "h"
+                E.axis = "H"
                 E[:] = self.height
 
                 nc.createDimension("y", len(self.y))
@@ -1295,35 +1373,45 @@ class igm:
                 E.axis = "X"
                 E[:] = self.x.numpy()
 
-                E = nc.createVariable('topg',np.dtype('float32').char,('time','y','x'))
-                E.units = 'm'
-                E.long_name = 'topg'
-                E.standard_name = 'topg' 
-                E[0,:,:] = self.topg.numpy()
-                
-                E = nc.createVariable('usurf',np.dtype('float32').char,('time','y','x'))
-                E.units = 'm'
-                E.long_name = 'usurf'
-                E.standard_name = 'usurf' 
-                E[0,:,:] = self.usurf.numpy()
+                E = nc.createVariable(
+                    "topg", np.dtype("float32").char, ("time", "y", "x")
+                )
+                E.units = "m"
+                E.long_name = "topg"
+                E.standard_name = "topg"
+                E[0, :, :] = self.topg.numpy()
 
-                E = nc.createVariable('U',np.dtype('float32').char,('time','h','y','x'))
-                E.units = 'm/y'
-                E.long_name = 'U'
-                E.standard_name = 'U' 
-                E[0,:,:,:] = self.U.numpy()
-                
-                E = nc.createVariable('V',np.dtype('float32').char,('time','h','y','x'))
-                E.units = 'm/y'
-                E.long_name = 'V'
-                E.standard_name = 'V' 
-                E[0,:,:,:] = self.V.numpy()
-                
-                E = nc.createVariable('W',np.dtype('float32').char,('time','h','y','x'))
-                E.units = 'm/y'
-                E.long_name = 'W'
-                E.standard_name = 'W' 
-                E[0,:,:,:] = self.W.numpy()
+                E = nc.createVariable(
+                    "usurf", np.dtype("float32").char, ("time", "y", "x")
+                )
+                E.units = "m"
+                E.long_name = "usurf"
+                E.standard_name = "usurf"
+                E[0, :, :] = self.usurf.numpy()
+
+                E = nc.createVariable(
+                    "U", np.dtype("float32").char, ("time", "h", "y", "x")
+                )
+                E.units = "m/y"
+                E.long_name = "U"
+                E.standard_name = "U"
+                E[0, :, :, :] = self.U.numpy()
+
+                E = nc.createVariable(
+                    "V", np.dtype("float32").char, ("time", "h", "y", "x")
+                )
+                E.units = "m/y"
+                E.long_name = "V"
+                E.standard_name = "V"
+                E[0, :, :, :] = self.V.numpy()
+
+                E = nc.createVariable(
+                    "W", np.dtype("float32").char, ("time", "h", "y", "x")
+                )
+                E.units = "m/y"
+                E.long_name = "W"
+                E.standard_name = "W"
+                E[0, :, :, :] = self.W.numpy()
 
                 nc.close()
 
@@ -1336,14 +1424,1466 @@ class igm:
                 )
 
                 d = nc.variables["time"][:].shape[0]
-                nc.variables["time"][d]        = self.t.numpy()
-                nc.variables['U'][d, :, :, :]  = self.U.numpy()
-                nc.variables['V'][d, :, :, :]  = self.V.numpy()
-                nc.variables['W'][d, :, :, :]  = self.W.numpy()
-                nc.variables['usurf'][d, :, :] = self.usurf.numpy()
-                nc.variables['topg'][d, :, :]  = self.topg.numpy()
+                nc.variables["time"][d] = self.t.numpy()
+                nc.variables["U"][d, :, :, :] = self.U.numpy()
+                nc.variables["V"][d, :, :, :] = self.V.numpy()
+                nc.variables["W"][d, :, :, :] = self.W.numpy()
+                nc.variables["usurf"][d, :, :] = self.usurf.numpy()
+                nc.variables["topg"][d, :, :] = self.topg.numpy()
 
                 nc.close()
+
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+    #                               OPTI
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+
+    def read_config_param_optimize(self):
+
+        # OPTIMIZATION PARAMETERS
+        self.parser.add_argument(
+            "--opti_vars_to_save",
+            type=list,
+            default=[
+                "topg",
+                "usurf",
+                "thk",
+                "strflowctrl",
+                "arrhenius",
+                "slidingco",
+                "velsurf_mag",
+                "velsurfobs_mag",
+                "divflux",
+            ],
+            help="List of variables to be recorded in the ncdef file",
+        )
+        self.parser.add_argument(
+            "--observation_file",
+            type=str,
+            default="observation.nc",
+            help="Observation file contains the 2D data observations fields (thkobs, usurfobs, uvelsurfobs, ....) ",
+        )
+        self.parser.add_argument(
+            "--thk_profiles_file",
+            type=str,
+            default="",
+            help="Provide ice thickness measurements, if empty string it will look for rasterized thk in the input data file",
+        )
+        self.parser.add_argument("--mode_opti", type=str, default="thkstrflowctrl")
+
+        self.parser.add_argument(
+            "--opti_thr_strflowctrl",
+            type=float,
+            default=78.0,
+            help="threshold value for strflowctrl",
+        )
+        self.parser.add_argument(
+            "--opti_init_zero_thk",
+            type=str2bool,
+            default="False",
+            help="Initialize the optimization with zero ice thickness",
+        )
+        self.parser.add_argument(
+            "--opti_regu_param_thk",
+            type=float,
+            default=10.0,
+            help="Regularization weight for the ice thickness in the optimization",
+        )
+        self.parser.add_argument(
+            "--opti_regu_param_strflowctrl",
+            type=float,
+            default=1.0,
+            help="Regularization weight for the strflowctrl field in the optimization",
+        )
+        self.parser.add_argument(
+            "--opti_smooth_anisotropy_factor",
+            type=float,
+            default=0.2,
+            help="Smooth anisotropy factor for the ice thickness regularization in the optimization",
+        )
+        self.parser.add_argument(
+            "--opti_convexity_weight",
+            type=float,
+            default=0.002,
+            help="Convexity weight for the ice thickness regularization in the optimization",
+        )
+        self.parser.add_argument(
+            "--opti_usurfobs_std",
+            type=float,
+            default=5.0,
+            help="Confidence/STD of the top ice surface as input data for the optimization",
+        )
+        self.parser.add_argument(
+            "--opti_strflowctrl_std",
+            type=float,
+            default=5.0,
+            help="Confidence/STD of strflowctrl",
+        )
+        self.parser.add_argument(
+            "--opti_velsurfobs_std",
+            type=float,
+            default=3.0,
+            help="Confidence/STD of the surface ice velocities as input data for the optimization (if 0, velsurfobs_std field must be given)",
+        )
+        self.parser.add_argument(
+            "--opti_thkobs_std",
+            type=float,
+            default=5.0,
+            help="Confidence/STD of the ice thickness profiles (unless given)",
+        )
+        self.parser.add_argument(
+            "--opti_divfluxobs_std",
+            type=float,
+            default=1.0,
+            help="Confidence/STD of the flux divergence as input data for the optimization (if 0, divfluxobs_std field must be given)",
+        )
+        self.parser.add_argument(
+            "--opti_control",
+            type=list,
+            default=["thk", "strflowctrl", "usurf"],
+            help="List of optimized variables for the optimization",
+        )
+        self.parser.add_argument(
+            "--opti_cost",
+            type=list,
+            default=["velsurf", "thk", "usurf", "divfluxfcz", "icemask"],
+            help="List of cost components for the optimization",
+        )
+        self.parser.add_argument(
+            "--opti_nbitmin",
+            type=int,
+            default=50,
+            help="Min iterations for the optimization",
+        )
+        self.parser.add_argument(
+            "--opti_nbitmax",
+            type=int,
+            default=1000,
+            help="Max iterations for the optimization",
+        )
+        self.parser.add_argument(
+            "--opti_step_size",
+            type=float,
+            default=0.001,
+            help="Step size for the optimization",
+        )
+        self.parser.add_argument(
+            "--opti_make_holes_in_data",
+            type=int,
+            default=0,
+            help="This produces artifical holes in data, serve to test the robustness of the method to missing data",
+        )
+        self.parser.add_argument(
+            "--opti_output_freq",
+            type=int,
+            default=50,
+            help="Frequency of the output for the optimization",
+        )
+
+    def make_data_holes(self):
+        """
+        This serves to make holes in surface data (velocities) to test robusness of the optimization
+        """
+
+        mask_holes = np.zeros_like(self.thk.numpy(), dtype="int")
+
+        if (self.config.opti_make_holes_in_data > 0) & (
+            self.config.opti_make_holes_in_data < 99
+        ):
+
+            np.random.seed(seed=123)
+
+            while (
+                np.sum(mask_holes) / np.sum(self.icemaskobs > 0.5)
+            ) < self.config.opti_make_holes_in_data * 0.01:
+
+                j = np.random.randint(0, self.thk.shape[0])
+                i = np.random.randint(0, self.thk.shape[1])
+
+                if self.icemaskobs[j, i] > 0.5:
+                    mask_holes[j, i] = 1
+
+        elif self.config.opti_make_holes_in_data == 100:
+            mask_holes = np.ones_like(self.thk.numpy(), dtype="int")
+
+        elif self.config.opti_make_holes_in_data == 200:
+            mask_holes[self.Y > np.mean(self.y)] = 1
+
+        self.uvelsurfobs = tf.where(
+            (self.icemaskobs == 1) & (mask_holes == 0), self.uvelsurfobs, np.nan
+        )
+        self.vvelsurfobs = tf.where(
+            (self.icemaskobs == 1) & (mask_holes == 0), self.vvelsurfobs, np.nan
+        )
+
+    def load_thk_profiles(self):
+        """
+        load glacier ice thickness mesured profiles
+        """
+
+        pathprofile = os.path.join(
+            self.config.working_dir, self.config.thk_profiles_file
+        )
+
+        if len(glob.glob(pathprofile)) > 0:
+
+            vvv = []
+            for g in glob.glob(pathprofile):
+                vvv.append(np.loadtxt(g, dtype=np.float32))
+            self.profile = np.concatenate(vvv, axis=0)
+
+            # re-index profiles in case there were not properly indexed
+            self.profile = [
+                self.profile[np.floor(self.profile[:, 0]) == i + 1, :]
+                for i in range(int(np.max(self.profile[:, 0])))
+            ]
+
+            # Remove empty List from List using list comprehension
+            self.profile = [ele for ele in self.profile if len(ele) > 0]
+
+            # compute the distance between points as first entry as it will be usefully later on
+            for p in self.profile:
+                p[:, 0] = np.insert(
+                    np.cumsum(np.sqrt(np.diff(p[:, 1]) ** 2 + np.diff(p[:, 2]) ** 2)),
+                    0,
+                    0,
+                )
+        else:
+            sys.exit("thk requested in opti, but file " + pathprofile + " is not found")
+
+        points = np.stack([item[1:3] for sublist in self.profile for item in sublist])
+        jiptprof = []
+        for p in points:
+            i = (p[0] - np.min(self.X)) / self.dx
+            j = (p[1] - np.min(self.Y)) / self.dx
+            jiptprof.append([j, i])
+        self.jiptprof = tf.expand_dims(jiptprof, axis=0)
+
+        target = np.stack([item[3] for sublist in self.profile for item in sublist])
+        self.thktargetprof = tf.Variable(target.astype("float32"))
+
+        target = np.stack([item[4] for sublist in self.profile for item in sublist])
+        self.thktargetprof_std = tf.Variable(target.astype("float32"))
+
+    def compute_flow_direction_for_anisotropic_smoothing(self):
+        """
+        compute_flow_direction_for_anisotropic_smoothing
+        """
+
+        uvelsurfobs = tf.where(tf.math.is_nan(self.uvelsurfobs), 0.0, self.uvelsurfobs)
+        vvelsurfobs = tf.where(tf.math.is_nan(self.vvelsurfobs), 0.0, self.vvelsurfobs)
+
+        self.flowdirx = (
+            uvelsurfobs[1:, 1:]
+            + uvelsurfobs[:-1, 1:]
+            + uvelsurfobs[1:, :-1]
+            + uvelsurfobs[:-1, :-1]
+        ) / 4.0
+        self.flowdiry = (
+            vvelsurfobs[1:, 1:]
+            + vvelsurfobs[:-1, 1:]
+            + vvelsurfobs[1:, :-1]
+            + vvelsurfobs[:-1, :-1]
+        ) / 4.0
+
+        from scipy.ndimage import gaussian_filter
+
+        self.flowdirx = gaussian_filter(self.flowdirx, 3, mode="constant")
+        self.flowdiry = gaussian_filter(self.flowdiry, 3, mode="constant")
+
+        # Same as gaussian filter above but for tensorflow is (NOT TESTED)
+        # import tensorflow_addons as tfa
+        # self.flowdirx.assign( tfa.image.gaussian_filter2d( self.flowdirx , sigma=3, filter_shape=100, padding="CONSTANT") )
+
+        self.flowdirx /= self.getmag(self.flowdirx, self.flowdiry)
+        self.flowdiry /= self.getmag(self.flowdirx, self.flowdiry)
+
+        self.flowdirx = tf.where(tf.math.is_nan(self.flowdirx), 0.0, self.flowdirx)
+        self.flowdiry = tf.where(tf.math.is_nan(self.flowdiry), 0.0, self.flowdiry)
+
+        # this is to plot the observed flow directions
+        # fig, axs = plt.subplots(1, 1, figsize=(8,16))
+        # plt.quiver(self.flowdirx,self.flowdiry)
+        # axs.axis("equal")
+
+    def optimize(self):
+        """
+        This is the optimization routine to invert thk, strflowctrl ans usurf from data
+        DEFAULT PARAMETERS ARE
+        # nbitmin=50, nbitmax=1000, opti_step_size=0.001,
+        # init_zero_thk=True,
+        # regu_param_thk=1.0, regu_param_strflowctrl=1.0,
+        # smooth_anisotropy_factor=0.2, convexity_weight = 0.002,
+        # opti_control=['thk','strflowctrl'], opti_cost=['velsurf','thk'],
+        """
+
+        ###### PERFORM CHECKS PRIOR OPTIMIZATIONS
+
+        # make sure this condition is satisfied
+        assert ("usurf" in self.config.opti_cost) == (
+            "usurf" in self.config.opti_control
+        )
+
+        # make sure the loaded ice flow emulator has these inputs
+        assert (
+            self.iceflow_mapping["fieldin"]
+            == ["thk", "slopsurfx", "slopsurfy", "arrhenius", "slidingco"]
+        ) | (
+            self.iceflow_mapping["fieldin"]
+            == ["thk", "slopsurfx", "slopsurfy", "strflowctrl"]
+        )
+
+        # make sure the loaded ice flow emulator has at least these outputs
+        assert all(
+            [
+                (f in self.iceflow_mapping["fieldout"])
+                for f in ["ubar", "vbar", "uvelsurf", "vvelsurf"]
+            ]
+        )
+
+        # make sure that there are lease some profiles in thkobs
+        if "thk" in self.config.opti_cost:
+            if self.config.thk_profiles_file == "":
+                assert not tf.reduce_all(tf.math.is_nan(self.thkobs))
+
+        ###### PREPARE DATA PRIOR OPTIMIZATIONS
+
+        if "thk" in self.config.opti_cost:
+            if not self.config.thk_profiles_file == "":
+                self.load_thk_profiles()
+
+        if hasattr(self, "uvelsurfobs") & hasattr(self, "vvelsurfobs"):
+            self.velsurfobs = tf.stack([self.uvelsurfobs, self.vvelsurfobs], axis=-1)
+
+        if "divfluxobs" in self.config.opti_cost:
+            self.divfluxobs = self.smb - self.dhdt
+
+        if not self.config.opti_smooth_anisotropy_factor == 1:
+            self.compute_flow_direction_for_anisotropic_smoothing()
+
+        if self.config.opti_make_holes_in_data > 0:
+            self.make_data_holes()
+
+        if hasattr(self, "thkinit"):
+            self.thk.assign(self.thkinit)
+        else:
+            self.thk.assign(tf.zeros_like(self.thk))
+
+        if self.config.opti_init_zero_thk:
+            self.thk.assign(tf.zeros_like(self.thk))
+
+        ###### PREPARE OPIMIZER
+
+        optimizer = tf.keras.optimizers.Adam(lr=self.config.opti_step_size)
+
+        # initial_learning_rate * decay_rate ^ (step / decay_steps)
+        # lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay( initial_learning_rate=opti_step_size, decay_steps=100, decay_rate=0.9)
+        # optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
+
+        # add scalng for usurf
+        self.iceflow_fieldbounds["usurf"] = (
+            self.iceflow_fieldbounds["slopsurfx"] * self.dx
+        )
+
+        ###### PREPARE VARIABLES TO OPTIMIZE
+
+        if self.iceflow_mapping["fieldin"] == [
+            "thk",
+            "slopsurfx",
+            "slopsurfy",
+            "arrhenius",
+            "slidingco",
+        ]:
+            self.iceflow_fieldbounds["strflowctrl"] = (
+                self.iceflow_fieldbounds["arrhenius"]
+                + self.iceflow_fieldbounds["slidingco"]
+            )
+
+        thk = tf.Variable(self.thk / self.iceflow_fieldbounds["thk"])  # normalized vars
+        strflowctrl = tf.Variable(
+            self.strflowctrl / self.iceflow_fieldbounds["strflowctrl"]
+        )  # normalized vars
+        usurf = tf.Variable(
+            self.usurf / self.iceflow_fieldbounds["usurf"]
+        )  # normalized vars
+
+        self.costs = []
+
+        self.tcomp["Optimize"] = []
+
+        # main loop
+        for i in range(self.config.opti_nbitmax):
+
+            with tf.GradientTape() as t:
+
+                self.tcomp["Optimize"].append(time.time())
+
+                # is necessary to remember all operation to derive the gradients w.r.t. control variables
+                if "thk" in self.config.opti_control:
+                    t.watch(thk)
+                if "usurf" in self.config.opti_control:
+                    t.watch(usurf)
+                if "strflowctrl" in self.config.opti_control:
+                    t.watch(strflowctrl)
+
+                # update surface gradient
+                if (i == 0) | ("usurf" in self.config.opti_control):
+                    slopsurfx, slopsurfy = self.compute_gradient_tf(
+                        usurf * self.iceflow_fieldbounds["usurf"], self.dx, self.dx
+                    )
+                    slopsurfx = slopsurfx / self.iceflow_fieldbounds["slopsurfx"]
+                    slopsurfy = slopsurfy / self.iceflow_fieldbounds["slopsurfy"]
+
+                if self.iceflow_mapping["fieldin"] == [
+                    "thk",
+                    "slopsurfx",
+                    "slopsurfy",
+                    "arrhenius",
+                    "slidingco",
+                ]:
+
+                    thrv = (
+                        self.config.opti_thr_strflowctrl
+                        / self.iceflow_fieldbounds["strflowctrl"]
+                    )
+                    arrhenius = tf.where(strflowctrl <= thrv, strflowctrl, thrv)
+                    slidingco = tf.where(strflowctrl <= thrv, 0, strflowctrl - thrv)
+
+                    # build input of the emulator
+                    X = tf.concat(
+                        [
+                            tf.expand_dims(
+                                tf.expand_dims(
+                                    tf.pad(thk, self.PAD, "CONSTANT"), axis=0
+                                ),
+                                axis=-1,
+                            ),
+                            tf.expand_dims(
+                                tf.expand_dims(
+                                    tf.pad(slopsurfx, self.PAD, "CONSTANT"), axis=0
+                                ),
+                                axis=-1,
+                            ),
+                            tf.expand_dims(
+                                tf.expand_dims(
+                                    tf.pad(slopsurfy, self.PAD, "CONSTANT"), axis=0
+                                ),
+                                axis=-1,
+                            ),
+                            tf.expand_dims(
+                                tf.expand_dims(
+                                    tf.pad(arrhenius, self.PAD, "CONSTANT"), axis=0
+                                ),
+                                axis=-1,
+                            ),
+                            tf.expand_dims(
+                                tf.expand_dims(
+                                    tf.pad(slidingco, self.PAD, "CONSTANT"), axis=0
+                                ),
+                                axis=-1,
+                            ),
+                        ],
+                        axis=-1,
+                    )
+
+                elif self.iceflow_mapping["fieldin"] == [
+                    "thk",
+                    "slopsurfx",
+                    "slopsurfy",
+                    "strflowctrl",
+                ]:
+
+                    # build input of the emulator
+                    X = tf.concat(
+                        [
+                            tf.expand_dims(
+                                tf.expand_dims(
+                                    tf.pad(thk, self.PAD, "CONSTANT"), axis=0
+                                ),
+                                axis=-1,
+                            ),
+                            tf.expand_dims(
+                                tf.expand_dims(
+                                    tf.pad(slopsurfx, self.PAD, "CONSTANT"), axis=0
+                                ),
+                                axis=-1,
+                            ),
+                            tf.expand_dims(
+                                tf.expand_dims(
+                                    tf.pad(slopsurfy, self.PAD, "CONSTANT"), axis=0
+                                ),
+                                axis=-1,
+                            ),
+                            tf.expand_dims(
+                                tf.expand_dims(
+                                    tf.pad(strflowctrl, self.PAD, "CONSTANT"), axis=0
+                                ),
+                                axis=-1,
+                            ),
+                        ],
+                        axis=-1,
+                    )
+                else:
+                    # ONLY these 2 above cases were implemented !!!
+                    sys.exit(
+                        "CHANGE THE ICE FLOW EMULATOR -- IMCOMPATIBLE FOR INVERSION "
+                    )
+
+                # evalutae th ice flow emulator
+                Y = self.iceflow_model(X)
+
+                # get the dimensions of the working array
+                Ny, Nx = self.thk.shape
+
+                # save output variables into igm.variables for outputs
+                for kk, f in enumerate(self.iceflow_mapping["fieldout"]):
+                    vars(self)[f].assign(
+                        Y[0, :Ny, :Nx, kk] * self.iceflow_fieldbounds[f]
+                    )
+
+                # find index of variables in output
+                iubar = self.iceflow_mapping["fieldout"].index("ubar")
+                ivbar = self.iceflow_mapping["fieldout"].index("vbar")
+                iuvsu = self.iceflow_mapping["fieldout"].index("uvelsurf")
+                ivvsu = self.iceflow_mapping["fieldout"].index("vvelsurf")
+
+                # save output of the emaultor to compute the costs function
+                ubar = (
+                    Y[0, :Ny, :Nx, iubar] * self.iceflow_fieldbounds["ubar"]
+                )  # NOT normalized vars
+                vbar = (
+                    Y[0, :Ny, :Nx, ivbar] * self.iceflow_fieldbounds["vbar"]
+                )  # NOT normalized vars
+                uvelsurf = (
+                    Y[0, :Ny, :Nx, iuvsu] * self.iceflow_fieldbounds["uvelsurf"]
+                )  # NOT normalized vars
+                vvelsurf = (
+                    Y[0, :Ny, :Nx, ivvsu] * self.iceflow_fieldbounds["vvelsurf"]
+                )  # NOT normalized vars
+                velsurf = tf.stack([uvelsurf, vvelsurf], axis=-1)  # NOT normalized vars
+
+                # misfit between surface velocity
+                if "velsurf" in self.config.opti_cost:
+                    ACT = ~tf.math.is_nan(self.velsurfobs)
+                    COST_U = 0.5 * tf.reduce_mean(
+                        (
+                            (self.velsurfobs[ACT] - velsurf[ACT])
+                            / self.config.opti_velsurfobs_std
+                        )
+                        ** 2
+                    )
+                else:
+                    COST_U = tf.Variable(0.0)
+
+                # misfit between ice thickness profiles
+                if "thk" in self.config.opti_cost:
+                    if self.config.thk_profiles_file == "":
+                        ACT = ~tf.math.is_nan(self.thkobs)
+                        COST_H = 0.5 * tf.reduce_mean(
+                            (
+                                (
+                                    self.thkobs[ACT]
+                                    - thk[ACT] * self.iceflow_fieldbounds["thk"]
+                                )
+                                / self.config.opti_thkobs_std
+                            )
+                            ** 2
+                        )
+                    else:
+                        import tensorflow_addons as tfa
+
+                        COST_H = 0.5 * tf.reduce_mean(
+                            (
+                                (
+                                    self.thktargetprof
+                                    - tfa.image.interpolate_bilinear(
+                                        tf.expand_dims(
+                                            tf.expand_dims(
+                                                thk * self.iceflow_fieldbounds["thk"],
+                                                axis=0,
+                                            ),
+                                            axis=-1,
+                                        ),
+                                        self.jiptprof,
+                                        indexing="ij",
+                                    )[0, :, 0]
+                                )
+                                / self.thktargetprof_std
+                            )
+                            ** 2
+                        )
+                else:
+                    COST_H = tf.Variable(0.0)
+
+                # misfit divergence of the flux
+                if ("divfluxobs" in self.config.opti_cost) | (
+                    "divfluxfcz" in self.config.opti_cost
+                ):
+
+                    divflux = self.compute_divflux(
+                        ubar,
+                        vbar,
+                        thk * self.iceflow_fieldbounds["thk"],
+                        self.dx,
+                        self.dx,
+                    )
+
+                    if "divfluxfcz" in self.config.opti_cost:
+                        ACT = self.icemaskobs > 0.5
+                        if i % 10 == 0:
+                            # his does not need to be comptued any iteration as this is expensive
+                            res = stats.linregress(
+                                self.usurf[ACT], divflux[ACT]
+                            )  # this is a linear regression (usually that's enough)
+                        # or you may go for polynomial fit (more gl, but may leads to errors)
+                        #  weights = np.polyfit(self.usurf[ACT],divflux[ACT], 2) 
+                        divfluxtar = tf.where(
+                            ACT, res.intercept + res.slope * self.usurf, 0.0
+                        )
+                    #                        divfluxtar = tf.where(ACT, np.poly1d(weights)(self.usurf) , 0.0 )
+
+                    else:
+                        divfluxtar = self.divfluxobs
+
+                    ACT = self.icemaskobs > 0.5
+                    COST_D = 0.5 * tf.reduce_mean(
+                        (
+                            (divfluxtar[ACT] - divflux[ACT])
+                            / self.config.opti_divfluxobs_std
+                        )
+                        ** 2
+                    )
+
+                else:
+                    COST_D = tf.Variable(0.0)
+
+                # misfit between top ice surfaces
+                if "usurf" in self.config.opti_cost:
+                    ACT = self.icemaskobs > 0.5
+                    COST_S = 0.5 * tf.reduce_mean(
+                        (
+                            (
+                                usurf[ACT] * self.iceflow_fieldbounds["usurf"]
+                                - self.usurfobs[ACT]
+                            )
+                            / self.config.opti_usurfobs_std
+                        )
+                        ** 2
+                    )
+                else:
+                    COST_S = tf.Variable(0.0)
+
+                # force usurf = usurf - topg
+                if "topg" in self.config.opti_cost:
+                    ACT = self.icemaskobs == 1
+                    COST_T = 10 ** 10 * tf.reduce_mean(
+                        (
+                            usurf[ACT] * self.iceflow_fieldbounds["usurf"]
+                            - thk[ACT] * self.iceflow_fieldbounds["thk"]
+                            - self.topg[ACT]
+                        )
+                        ** 2
+                    )
+                else:
+                    COST_T = tf.Variable(0.0)
+
+                # force zero thikness outisde the mask
+                if "icemask" in self.config.opti_cost:
+                    COST_O = 10 ** 10 * tf.math.reduce_mean(
+                        tf.where(self.icemaskobs > 0.5, 0.0, thk ** 2)
+                    )
+                else:
+                    COST_O = tf.Variable(0.0)
+
+                # Here one enforces non-negative ice thickness, and possibly zero-thickness in user-defined ice-free areas.
+                if "thk" in self.config.opti_control:
+                    COST_HPO = 10 ** 10 * tf.math.reduce_mean(
+                        tf.where(thk >= 0, 0.0, thk ** 2)
+                    )
+                else:
+                    COST_HPO = tf.Variable(0.0)
+
+                # # Make sur to keep reasonable values for strflowctrl
+                if "strflowctrl" in self.config.opti_control:
+                    COST_STR = 0.5 * tf.reduce_mean(
+                        (
+                            (
+                                strflowctrl * self.iceflow_fieldbounds["strflowctrl"]
+                                - self.config.opti_thr_strflowctrl
+                            )
+                            / self.config.opti_strflowctrl_std
+                        )
+                        ** 2
+                    )
+                else:
+                    COST_STR = tf.Variable(0.0)
+
+                # Here one adds a regularization terms for the ice thickness to the cost function
+                if "thk" in self.config.opti_control:
+                    dbdx = thk[:, 1:] - thk[:, :-1]
+                    dbdx = (dbdx[1:, :] + dbdx[:-1, :]) / 2.0
+                    dbdy = thk[1:, :] - thk[:-1, :]
+                    dbdy = (dbdy[:, 1:] + dbdy[:, :-1]) / 2.0
+
+                    if self.config.opti_smooth_anisotropy_factor == 1:
+                        REGU_H = self.config.opti_regu_param_thk * (
+                            tf.nn.l2_loss(dbdx) + tf.nn.l2_loss(dbdy)
+                        )
+                    else:
+                        REGU_H = self.config.opti_regu_param_thk * (
+                            tf.nn.l2_loss((dbdx * self.flowdirx + dbdy * self.flowdiry))
+                            + self.config.opti_smooth_anisotropy_factor
+                            * tf.nn.l2_loss(
+                                (dbdx * self.flowdiry - dbdy * self.flowdirx)
+                            )
+                            - self.config.opti_convexity_weight
+                            * tf.math.reduce_sum(thk)
+                        )
+                else:
+                    REGU_H = tf.Variable(0.0)
+
+                # Here one adds a regularization terms for strflowctrl to the cost function
+                if "strflowctrl" in self.config.opti_control:
+                    dadx = tf.math.abs(strflowctrl[:, 1:] - strflowctrl[:, :-1])
+                    dady = tf.math.abs(strflowctrl[1:, :] - strflowctrl[:-1, :])
+                    dadx = tf.where(
+                        (self.icemaskobs[:, 1:] > 0.5)
+                        & (self.icemaskobs[:, :-1] > 0.5),
+                        dadx,
+                        0.0,
+                    )
+                    dady = tf.where(
+                        (self.icemaskobs[1:, :] > 0.5)
+                        & (self.icemaskobs[:-1, :] > 0.5),
+                        dady,
+                        0.0,
+                    )
+                    REGU_A = self.config.opti_regu_param_strflowctrl * (
+                        tf.nn.l2_loss(dadx) + tf.nn.l2_loss(dady)
+                    )
+                else:
+                    REGU_A = tf.Variable(0.0)
+
+                # sum all component into the main cost function
+                COST = (
+                    COST_U
+                    + COST_H
+                    + COST_D
+                    + COST_S
+                    + COST_T
+                    + COST_O
+                    + COST_HPO
+                    + COST_STR
+                    + REGU_H
+                    + REGU_A
+                )
+
+                vol = (
+                    np.sum(thk * self.iceflow_fieldbounds["thk"])
+                    * (self.dx ** 2)
+                    / 10 ** 9
+                )
+
+                if i % self.config.opti_output_freq == 0:
+                    print(
+                        " OPTI, step %5.0f , ICE_VOL: %7.2f , COST_U: %7.2f , COST_H: %7.2f , COST_D : %7.2f , COST_S : %7.2f , REGU_H : %7.2f , REGU_A : %7.2f "
+                        % (
+                            i,
+                            vol,
+                            COST_U.numpy(),
+                            COST_H.numpy(),
+                            COST_D.numpy(),
+                            COST_S.numpy(),
+                            REGU_H.numpy(),
+                            REGU_A.numpy(),
+                        )
+                    )
+
+                self.costs.append(
+                    [
+                        COST_U.numpy(),
+                        COST_H.numpy(),
+                        COST_D.numpy(),
+                        COST_S.numpy(),
+                        REGU_H.numpy(),
+                        REGU_A.numpy(),
+                    ]
+                )
+
+                var_to_opti = []
+                if "thk" in self.config.opti_control:
+                    var_to_opti.append(thk)
+                if "usurf" in self.config.opti_control:
+                    var_to_opti.append(usurf)
+                if "strflowctrl" in self.config.opti_control:
+                    var_to_opti.append(strflowctrl)
+
+                # Compute gradient of COST w.r.t. X
+                grads = tf.Variable(t.gradient(COST, var_to_opti))
+
+                # this serve to restict the optimization of controls to the mask
+                for ii in range(grads.shape[0]):
+                    grads[ii].assign(tf.where((self.icemaskobs > 0.5), grads[ii], 0))
+
+                # One step of descent -> this will update input variable X
+                optimizer.apply_gradients(
+                    zip([grads[i] for i in range(grads.shape[0])], var_to_opti)
+                )
+
+                # get back optimized variables in the pool of igm.variables
+                if "thk" in self.config.opti_control:
+                    self.thk.assign(thk * self.iceflow_fieldbounds["thk"])
+                    self.thk.assign(tf.where(self.thk < 0.01, 0, self.thk))
+                if "strflowctrl" in self.config.opti_control:
+                    self.strflowctrl.assign(
+                        strflowctrl * self.iceflow_fieldbounds["strflowctrl"]
+                    )
+                if "usurf" in self.config.opti_control:
+                    self.usurf.assign(usurf * self.iceflow_fieldbounds["usurf"])
+
+                self.divflux = self.compute_divflux(
+                    self.ubar, self.vbar, self.thk, self.dx, self.dx
+                )
+
+                self.compute_rms_std_optimization(i)
+
+                self.tcomp["Optimize"][-1] -= time.time()
+                self.tcomp["Optimize"][-1] *= -1
+
+                if i % self.config.opti_output_freq == 0:
+                    self.update_plot_inversion(i, self.config.plot_live)
+                    self.update_ncdf_optimize(i)
+                # self.update_plot_profiles(i,plot_live)
+
+                # stopping criterion: stop if the cost no longer decrease
+                # if i>self.config.opti_nbitmin:
+                #     cost = [c[0] for c in costs]
+                #     if np.mean(cost[-10:])>np.mean(cost[-20:-10]):
+                #         break;
+
+        # now that the ice thickness is optimized, we can fix the bed once for all!
+        self.topg.assign(self.usurf - self.thk)
+
+        self.output_ncdf_optimize_final()
+
+        self.plot_cost_functions(self.costs, self.config.plot_live)
+
+        np.savetxt(
+            os.path.join(self.config.working_dir, "costs.dat"),
+            np.stack(self.costs),
+            fmt="%.10f",
+            header="        COST_U        COST_H      COST_D       COST_S       REGU_H       REGU_A          HPO ",
+        )
+
+        np.savetxt(
+            os.path.join(self.config.working_dir, "rms_std.dat"),
+            np.stack(
+                [
+                    self.rmsthk,
+                    self.stdthk,
+                    self.rmsvel,
+                    self.stdvel,
+                    self.rmsdiv,
+                    self.stddiv,
+                    self.rmsusurf,
+                    self.stdusurf,
+                ],
+                axis=-1,
+            ),
+            fmt="%.10f",
+            header="        rmsthk      stdthk       rmsvel       stdvel       rmsdiv       stddiv       rmsusurf       stdusurf",
+        )
+
+        np.savetxt(
+            os.path.join(self.config.working_dir, "strflowctrl.dat"),
+            np.array(
+                [
+                    np.mean(self.strflowctrl[self.icemaskobs > 0.5]),
+                    np.std(self.strflowctrl[self.icemaskobs > 0.5]),
+                ]
+            ),
+            fmt="%.3f",
+        )
+
+        np.savetxt(
+            os.path.join(self.config.working_dir, "volume.dat"),
+            np.array([np.sum(self.thk) * self.dx * self.dx / (10 ** 9)]),
+            fmt="%.3f",
+        )
+
+        np.savetxt(
+            os.path.join(self.config.working_dir, "tcompoptimize.dat"),
+            np.array([np.sum([f for f in self.tcomp["Optimize"]])]),
+            fmt="%.3f",
+        )
+
+    def run_opti(self):
+
+        self.initialize()
+
+        with tf.device(self.device_name):
+
+            self.load_ncdf_data(self.config.observation_file)
+
+            self.initialize_fields()
+
+            self.initialize_iceflow()
+
+            self.optimize()
+
+    def compute_rms_std_optimization(self, i):
+        """
+        compute_std_optimization
+        """
+
+        I = self.icemaskobs == 1
+
+        if i == 0:
+            self.rmsthk = []
+            self.stdthk = []
+            self.rmsvel = []
+            self.stdvel = []
+            self.rmsusurf = []
+            self.stdusurf = []
+            self.rmsdiv = []
+            self.stddiv = []
+
+        if hasattr(self, "profile") | hasattr(self, "thkobs"):
+            if self.config.thk_profiles_file == "":
+                ACT = ~tf.math.is_nan(self.thkobs)
+                if np.sum(ACT) == 0:
+                    self.rmsthk.append(0)
+                    self.stdthk.append(0)
+                else:
+                    self.rmsthk.append(np.nanmean(self.thk[ACT] - self.thkobs[ACT]))
+                    self.stdthk.append(np.nanstd(self.thk[ACT] - self.thkobs[ACT]))
+
+            else:
+                fthk = RectBivariateSpline(self.x, self.y, np.transpose(self.thk))
+                thkdiff = np.concatenate(
+                    [
+                        (fthk(p[:, 1], p[:, 2], grid=False) - p[:, 3])
+                        for p in self.profile
+                    ]
+                )
+                self.rmsthk.append(np.mean(thkdiff))
+                self.stdthk.append(np.std(thkdiff))
+        else:
+            self.rmsthk.append(0)
+            self.stdthk.append(0)
+
+        if hasattr(self, "uvelsurfobs"):
+            velsurf_mag = self.getmag(self.uvelsurf, self.vvelsurf).numpy()
+            velsurfobs_mag = self.getmag(self.uvelsurfobs, self.vvelsurfobs).numpy()
+            ACT = ~np.isnan(velsurfobs_mag)
+
+            self.rmsvel.append(
+                np.mean(
+                    velsurf_mag[(I & ACT).numpy()] - velsurfobs_mag[(I & ACT).numpy()]
+                )
+            )
+            self.stdvel.append(
+                np.std(
+                    velsurf_mag[(I & ACT).numpy()] - velsurfobs_mag[(I & ACT).numpy()]
+                )
+            )
+        else:
+            self.rmsvel.append(0)
+            self.stdvel.append(0)
+
+        if hasattr(self, "divfluxobs"):
+            self.rmsdiv.append(np.mean(self.divfluxobs[I] - self.divflux[I]))
+            self.stddiv.append(np.std(self.divfluxobs[I] - self.divflux[I]))
+        else:
+            self.rmsdiv.append(0)
+            self.stddiv.append(0)
+
+        if hasattr(self, "usurfobs"):
+            self.rmsusurf.append(np.mean(self.usurf[I] - self.usurfobs[I]))
+            self.stdusurf.append(np.std(self.usurf[I] - self.usurfobs[I]))
+        else:
+            self.rmsusurf.append(0)
+            self.stdusurf.append(0)
+
+    def update_ncdf_optimize(self, it):
+        """
+        Initialize and write the ncdf optimze file
+        """
+
+        if self.config.verbosity == 1:
+            print("Initialize  and write NCDF output Files")
+
+        if "arrhenius" in self.config.opti_vars_to_save:
+            self.arrhenius = tf.where(
+                self.strflowctrl <= self.config.opti_thr_strflowctrl,
+                self.strflowctrl,
+                self.config.opti_thr_strflowctrl,
+            )
+
+        if "slidingco" in self.config.opti_vars_to_save:
+            self.slidingco = tf.where(
+                self.strflowctrl <= self.config.opti_thr_strflowctrl,
+                0,
+                self.strflowctrl - self.config.opti_thr_strflowctrl,
+            )
+
+        if "topg" in self.config.opti_vars_to_save:
+            self.topg.assign(self.usurf - self.thk)
+
+        if "velsurf_mag" in self.config.opti_vars_to_save:
+            self.velsurf_mag = self.getmag(self.uvelsurf, self.vvelsurf)
+
+        if "velsurfobs_mag" in self.config.opti_vars_to_save:
+            self.velsurfobs_mag = self.getmag(self.uvelsurfobs, self.vvelsurfobs)
+
+        if it == 0:
+
+            nc = Dataset(
+                os.path.join(self.config.working_dir, "optimize.nc"),
+                "w",
+                format="NETCDF4",
+            )
+
+            nc.createDimension("iterations", None)
+            E = nc.createVariable("iterations", dtype("float32").char, ("iterations",))
+            E.units = "None"
+            E.long_name = "iterations"
+            E.axis = "ITERATIONS"
+            E[0] = it
+
+            nc.createDimension("y", len(self.y))
+            E = nc.createVariable("y", dtype("float32").char, ("y",))
+            E.units = "m"
+            E.long_name = "y"
+            E.axis = "Y"
+            E[:] = self.y.numpy()
+
+            nc.createDimension("x", len(self.x))
+            E = nc.createVariable("x", dtype("float32").char, ("x",))
+            E.units = "m"
+            E.long_name = "x"
+            E.axis = "X"
+            E[:] = self.x.numpy()
+
+            for var in self.config.opti_vars_to_save:
+
+                E = nc.createVariable(
+                    var, dtype("float32").char, ("iterations", "y", "x")
+                )
+                # E.long_name = self.var_info[var][0]
+                # E.units = self.var_info[var][1]
+                E[0, :, :] = vars(self)[var].numpy()
+
+            nc.close()
+
+        else:
+
+            nc = Dataset(
+                os.path.join(self.config.working_dir, "optimize.nc"),
+                "a",
+                format="NETCDF4",
+            )
+
+            d = nc.variables["iterations"][:].shape[0]
+
+            nc.variables["iterations"][d] = it
+
+            for var in self.config.opti_vars_to_save:
+                nc.variables[var][d, :, :] = vars(self)[var].numpy()
+
+            nc.close()
+
+    def output_ncdf_optimize_final(self):
+        """
+        Write final geology after optimizing
+        """
+
+        if self.config.verbosity == 1:
+            print("Write the final geology ncdf file after optimization")
+
+        nc = Dataset(
+            os.path.join(self.config.working_dir, self.config.observation_file), "r"
+        )
+        varori = [v for v in nc.variables]
+        nc.close()
+
+        varori.remove("x")
+        varori.remove("y")
+        if not "strflowctrl" in varori:
+            varori.append("strflowctrl")
+        if not "thk" in varori:
+            varori.append("thk")
+        if not "usurf" in varori:
+            varori.append("usurf")
+        if not "icemask" in varori:
+            varori.append("icemask")
+
+        self.arrhenius = tf.where(
+            self.strflowctrl <= self.config.opti_thr_strflowctrl,
+            self.strflowctrl,
+            self.config.opti_thr_strflowctrl,
+        )
+        self.slidingco = tf.where(
+            self.strflowctrl <= self.config.opti_thr_strflowctrl,
+            0,
+            self.strflowctrl - self.config.opti_thr_strflowctrl,
+        )
+        self.velsurf_mag = self.getmag(self.uvelsurf, self.vvelsurf)
+
+        self.icemask = tf.where(
+            self.thk > 1.0, tf.ones_like(self.thk), tf.zeros_like(self.thk)
+        )
+
+        if os.path.isfile(os.path.join(self.config.working_dir, "geology.nc")):
+            filename = "geology-optimized.nc"
+        else:
+            filename = "geology.nc"
+
+        nc = Dataset(
+            os.path.join(self.config.working_dir, filename),
+            "w",
+            format="NETCDF4",
+        )
+
+        nc.createDimension("y", len(self.y))
+        E = nc.createVariable("y", dtype("float32").char, ("y",))
+        E.units = "m"
+        E.long_name = "y"
+        E.axis = "Y"
+        E[:] = self.y.numpy()
+
+        nc.createDimension("x", len(self.x))
+        E = nc.createVariable("x", dtype("float32").char, ("x",))
+        E.units = "m"
+        E.long_name = "x"
+        E.axis = "X"
+        E[:] = self.x.numpy()
+
+        for var in varori:
+
+            if hasattr(self, var):
+                E = nc.createVariable(var, dtype("float32").char, ("y", "x"))
+                #                E.long_name = self.var_info[var][0]
+                #                E.units     = self.var_info[var][1]
+                E[:, :] = vars(self)[var].numpy()
+
+        nc.close()
+
+    def plot_cost_functions(self, costs, plot_live):
+
+        costs = np.stack(costs)
+
+        for i in range(costs.shape[1]):
+            costs[:, i] -= np.min(costs[:, i])
+            costs[:, i] /= np.max(costs[:, i])
+
+        fig = plt.figure(figsize=(10, 10))
+        plt.plot(costs[:, 0], "-k", label="COST U")
+        plt.plot(costs[:, 1], "-r", label="COST H")
+        plt.plot(costs[:, 2], "-b", label="COST D")
+        plt.plot(costs[:, 3], "-g", label="COST S")
+        plt.plot(costs[:, 4], "--c", label="REGU H")
+        plt.plot(costs[:, 5], "--m", label="REGU A")
+        plt.ylim(0, 1)
+        plt.legend()
+
+        if plot_live:
+            plt.show()
+        else:
+            plt.savefig(
+                os.path.join(self.config.working_dir, "convergence.png"), pad_inches=0
+            )
+            plt.close("all")
+
+    def update_plot_inversion(self, i, plot_live):
+        """
+        Plot thickness, velocity, mand slidingco
+        """
+
+        if self.config.plot_result:
+
+            if hasattr(self, "uvelsurfobs"):
+                velsurfobs_mag = self.getmag(self.uvelsurfobs, self.vvelsurfobs).numpy()
+            else:
+                velsurfobs_mag = np.zeros_like(self.thk.numpy())
+
+            if hasattr(self, "usurfobs"):
+                usurfobs = self.usurfobs
+            else:
+                usurfobs = np.zeros_like(self.thk.numpy())
+
+            ########################################################
+
+            fig = plt.figure(figsize=(18, 13))
+
+            #########################################################
+
+            ax = fig.add_subplot(2, 3, 1)
+            extent = [self.x[0], self.x[-1], self.y[0], self.y[-1]]
+            im1 = ax.imshow(self.thk, origin="lower", extent=extent, vmin=0, vmax=800)
+            plt.colorbar(im1)
+
+            if hasattr(self, "profile"):
+                fthk = RectBivariateSpline(self.x, self.y, np.transpose(self.thk))
+                for j, p in enumerate(self.profile):
+                    if j > 0:
+                        meanfitprofile = np.mean(
+                            fthk(p[:, 1], p[:, 2], grid=False) - p[:, 3]
+                        )
+                        ax.scatter(p[:, 1], p[:, 2], c="k", s=1)
+                        ax.text(
+                            np.mean(p[:, 1]),
+                            np.mean(p[:, 2]),
+                            str(int(meanfitprofile)),
+                            fontsize=15,
+                        )
+
+            ax.set_title(
+                "THK, RMS : "
+                + str(int(self.rmsthk[-1]))
+                + ", STD : "
+                + str(int(self.stdthk[-1])),
+                size=15,
+            )
+            ax.axis("off")
+
+            #########################################################
+
+            ax = fig.add_subplot(2, 3, 2)
+            velsurf_mag = self.getmag(self.uvelsurf, self.vvelsurf).numpy()
+            im1 = ax.imshow(
+                velsurf_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)
+            )
+            plt.colorbar(im1, format="%.2f")
+            ax.set_title(
+                "MOD VEL, RMS : "
+                + str(int(self.rmsvel[-1]))
+                + ", STD : "
+                + str(int(self.stdvel[-1])),
+                size=15,
+            )
+            ax.axis("off")
+
+            ########################################################
+
+            ax = fig.add_subplot(2, 3, 3)
+            im1 = ax.imshow(self.divflux, origin="lower", vmin=-15, vmax=5)
+            plt.colorbar(im1, format="%.2f")
+            ax.set_title(
+                "MOD DIV, RMS : %5.1f , STD : %5.1f"
+                % (self.rmsdiv[-1], self.stddiv[-1]),
+                size=15,
+            )
+            ax.axis("off")
+
+            #########################################################
+
+            ax = fig.add_subplot(2, 3, 4)
+            im1 = ax.imshow(self.usurf - usurfobs, origin="lower", vmin=-10, vmax=10)
+            plt.colorbar(im1, format="%.2f")
+            ax.set_title(
+                "DELTA USURF, RMS : %5.1f , STD : %5.1f"
+                % (self.rmsusurf[-1], self.stdusurf[-1]),
+                size=15,
+            )
+            ax.axis("off")
+
+            ########################################################
+
+            ax = fig.add_subplot(2, 3, 5)
+            im1 = ax.imshow(
+                velsurfobs_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)
+            )
+            plt.colorbar(im1, format="%.2f")
+            ax.set_title("OBS VEL (TARGET)", size=15)
+            ax.axis("off")
+
+            #######################################################
+
+            ax = fig.add_subplot(2, 3, 6)
+            im1 = ax.imshow(self.strflowctrl, origin="lower", vmin=50, vmax=110)
+            plt.colorbar(im1, format="%.2f")
+            ax.set_title("strflowctrl", size=15)
+            ax.axis("off")
+
+            #########################################################
+
+            plt.tight_layout()
+
+            if plot_live:
+                plt.show()
+            else:
+                plt.savefig(
+                    os.path.join(
+                        self.config.working_dir, "resu-opti-" + str(i).zfill(4) + ".png"
+                    ),
+                    pad_inches=0,
+                )
+                plt.close("all")
+
+    def plot_opti_diff(self, file, vari, plot_live=True):
+        """
+        Plot thickness, velocity, mand slidingco
+        """
+
+        from matplotlib import cm
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+        import matplotlib.pyplot as plt
+        import xarray as xr
+
+        data = xr.open_dataset(file, engine="netcdf4")[vari]
+
+        minvar = np.min(data[-1])
+        minvardiff = minvar / 5
+        maxvar = np.max(data[-1])
+        maxvardiff = maxvar / 5
+
+        if vari == "divflux":
+            maxvar = 10
+            maxvardiff = 10
+            minvar = -10
+            minvardiff = -10
+
+        if vari == "thk":
+            maxvardiff = maxvar / 5
+            minvardiff = -maxvar / 5
+
+        if vari == "usurf":
+            maxvardiff = 10
+            minvardiff = -10
+
+        extent = [self.x[0], self.x[-1], self.y[0], self.y[-1]]
+
+        dicc = {}
+        dicc["thk"] = "thk"
+        dicc["velsurf_mag"] = "vel"
+        dicc["usurf"] = "usurf"
+        dicc["divflux"] = "div"
+
+        ########################################################
+
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 6), dpi=200)
+
+        if vari in ["velsurf_mag"]:  # ,'thk'
+            rms = str(int(vars(self)["rms" + dicc[vari]][0]))
+            std = str(int(vars(self)["std" + dicc[vari]][0]))
+            comp = " (RMS: " + rms + ", STD: " + std + ")"
+        else:
+            comp = ""
+
+        ax1.set_title("Initial " + vari + comp)
+        im1 = ax1.imshow(
+            np.where(self.thk > 1, data[0], np.nan),
+            origin="lower",
+            extent=extent,
+            vmin=minvar,
+            vmax=maxvar,
+            cmap=cm.get_cmap("viridis", 8),
+        )
+        divider = make_axes_locatable(ax1)
+        cax1 = divider.append_axes("right", size="5%", pad=0.05)
+        cbar1 = plt.colorbar(im1, format="%.0f", cax=cax1, orientation="vertical")
+        ax1.axis("off")
+
+        if vari in ["velsurf_mag", "thk"]:
+            rms = str(int(vars(self)["rms" + dicc[vari]][-1]))
+            std = str(int(vars(self)["std" + dicc[vari]][-1]))
+            comp = " (RMS: " + rms + ", STD: " + std + ")"
+        else:
+            comp = ""
+
+        ax2.set_title("Optimized " + vari + comp)
+        im2 = ax2.imshow(
+            np.where(self.thk > 1, data[-1], np.nan),
+            origin="lower",
+            extent=extent,
+            vmin=minvar,
+            vmax=maxvar,
+            cmap=cm.get_cmap("viridis", 8),
+        )
+        divider = make_axes_locatable(ax2)
+        cax2 = divider.append_axes("right", size="5%", pad=0.05)
+        cbar2 = plt.colorbar(im2, format="%.0f", cax=cax2, orientation="vertical")
+        ax2.axis("off")
+
+        if vari == "velsurf_mag":
+            velsurfobs_mag = xr.open_dataset(file, engine="netcdf4")["velsurfobs_mag"]
+            tod = np.where(self.thk > 1, velsurfobs_mag[0], np.nan)
+            ax3.set_title("Target")
+            im3 = ax3.imshow(
+                tod,
+                origin="lower",
+                extent=extent,
+                vmin=minvar,
+                vmax=maxvar,
+                cmap=cm.get_cmap("viridis", 8),
+            )
+            divider = make_axes_locatable(ax3)
+            cax3 = divider.append_axes("right", size="5%", pad=0.05)
+            cbar3 = plt.colorbar(im3, format="%.0f", cax=cax3, orientation="vertical")
+            ax3.axis("off")
+        else:
+            tod = np.where(self.thk > 1, data[-1] - data[0], np.nan)
+            ax3.set_title("Optimized - Initial")
+            im3 = ax3.imshow(
+                tod,
+                origin="lower",
+                vmin=minvardiff,
+                vmax=maxvardiff,
+                cmap=cm.get_cmap("RdBu", 10),
+            )
+            divider = make_axes_locatable(ax3)
+            cax3 = divider.append_axes("right", size="5%", pad=0.05)
+            cbar3 = plt.colorbar(im3, format="%.0f", cax=cax3, orientation="vertical")
+            ax3.axis("off")
+
+        #########################################################
+
+        plt.tight_layout()
+
+        if plot_live:
+            plt.show()
+        else:
+            plt.savefig(
+                os.path.join(self.config.working_dir, "resu-opti-" + vari + "-.png"),
+                pad_inches=0,
+            )
+            plt.close("all")
+
+    def update_plot_profiles(self, i, plot_live):
+
+        from scipy.interpolate import RectBivariateSpline
+
+        fthk = RectBivariateSpline(self.x, self.y, np.transpose(self.thk))
+
+        N = len(self.profile)
+        N1 = int(np.sqrt(N)) + 1
+        N2 = N1
+        fig, axs = plt.subplots(N1, N2, figsize=(N1 * 10, N2 * 5))
+        #            fig, axs = plt.subplots(N,1,figsize=(10,N*4))
+        for j, p in enumerate(self.profile):
+            if j > 0:
+                jj = j // N1
+                ii = j % N1
+                axs[ii, jj].set_title(" PROFILE N° : " + str(j))
+                axs[ii, jj].plot(p[:, 0], p[:, 3], "-k")
+                axs[ii, jj].plot(p[:, 0], fthk(p[:, 1], p[:, 2], grid=False), "-b")
+                axs[ii, jj].axis("equal")
+        plt.tight_layout()
+
+        if plot_live:
+            plt.show()
+        else:
+            plt.savefig(
+                os.path.join(
+                    self.config.working_dir, "S1-pro-" + str(i).zfill(4) + ".png"
+                ),
+                pad_inches=0,
+            )
+            plt.close("all")
 
     ####################################################################################
     ####################################################################################
@@ -1356,7 +2896,10 @@ class igm:
     def read_config_param_plot(self):
 
         self.parser.add_argument(
-            "--varplot", type=str, default="velbar_mag", help="variable to plot",
+            "--varplot",
+            type=str,
+            default="velbar_mag",
+            help="variable to plot",
         )
         self.parser.add_argument(
             "--varplot_max",
@@ -1367,7 +2910,7 @@ class igm:
 
     def update_plot(self, force=False):
         """
-            Plot thickness, velocity, mass balance
+        Plot thickness, velocity, mass balance
         """
 
         if force | (self.saveresult & self.config.plot_result):
@@ -1416,7 +2959,10 @@ class igm:
                 plt.savefig(
                     os.path.join(
                         self.config.working_dir,
-                        self.config.varplot + "-" + str(self.t.numpy()).zfill(4) + ".png",
+                        self.config.varplot
+                        + "-"
+                        + str(self.t.numpy()).zfill(4)
+                        + ".png",
                     ),
                     bbox_inches="tight",
                     pad_inches=0.2,
@@ -1427,7 +2973,7 @@ class igm:
 
     def plot_computational_pie(self):
         """
-            Plot to the computational time of each model components in a pie
+        Plot to the computational time of each model components in a pie
         """
 
         def make_autopct(values):
@@ -1466,51 +3012,56 @@ class igm:
             os.path.join(self.config.working_dir, "PIE-COMPUTATIONAL.png"), pad_inches=0
         )
         plt.close("all")
-        
-    def animate_result(self,file,vari,save=False):
-        
+
+    def animate_result(self, file, vari, save=False):
+
         from IPython.display import HTML, display
-        import xarray as xr 
+        import xarray as xr
         from matplotlib import pyplot as plt, animation
-         
-        data  = xr.open_dataset(file,engine='netcdf4')[vari]    ;
-        
+
+        data = xr.open_dataset(file, engine="netcdf4")[vari]
+
         minvar = np.min(data)
         maxvar = np.max(data)
-        
-        if vari=='divflux':
+
+        if vari == "divflux":
             maxvar = 10
             minvar = -10
-        
-        thk  = xr.open_dataset(file,engine='netcdf4')['thk']  
-        
-        data = xr.where(thk>1,data,np.nan)
-         
-        ratio = self.y.shape[0]/self.x.shape[0]
-        
-        fig, ax = plt.subplots(figsize=(6,6*ratio),dpi=200)
-        
-        # Plot the initial frame. 
-        cax = data[0,:,:].plot(add_colorbar=True,cmap=plt.cm.get_cmap('jet', 20),vmin=minvar, vmax=maxvar)
-        ax.axis("off") ; ax.axis("equal")
-        
+
+        thk = xr.open_dataset(file, engine="netcdf4")["thk"]
+
+        data = xr.where(thk > 1, data, np.nan)
+
+        ratio = self.y.shape[0] / self.x.shape[0]
+
+        fig, ax = plt.subplots(figsize=(6, 6 * ratio), dpi=200)
+
+        # Plot the initial frame.
+        cax = data[0, :, :].plot(
+            add_colorbar=True, cmap=plt.cm.get_cmap("jet", 20), vmin=minvar, vmax=maxvar
+        )
+        ax.axis("off")
+        ax.axis("equal")
+
         # dont' show the original frame
         plt.close()
-        
+
         def animate(i):
-            cax.set_array(data[i,:,:].values.flatten())
-            if 'iterations' in data.coords.variables:
-                ax.set_title("It = " + str(data.coords['iterations'].values[i])[:13])
+            cax.set_array(data[i, :, :].values.flatten())
+            if "iterations" in data.coords.variables:
+                ax.set_title("It = " + str(data.coords["iterations"].values[i])[:13])
             else:
-                ax.set_title("Time = " + str(data.coords['time'].values[i])[:13])
-        
-        ani = animation.FuncAnimation( fig, animate, frames=data.shape[0], interval=100 ) # interval in ms between frames
-        
+                ax.set_title("Time = " + str(data.coords["time"].values[i])[:13])
+
+        ani = animation.FuncAnimation(
+            fig, animate, frames=data.shape[0], interval=100
+        )  # interval in ms between frames
+
         HTML(ani.to_html5_video())
-        
+
         # optionally the animation can be saved in avi
         if save:
-            ani.save(file.split('.')[0]+'-'+vari+'.mp4')
+            ani.save(file.split(".")[0] + "-" + vari + ".mp4")
 
     ####################################################################################
     ####################################################################################
@@ -1522,7 +3073,7 @@ class igm:
 
     def print_info(self):
         """
-            This serves to print key info on the fly during computation
+        This serves to print key info on the fly during computation
         """
         if self.saveresult:
             print(
@@ -1538,7 +3089,7 @@ class igm:
 
     def print_comp_info_live(self):
         """
-            This serves to print computational info on the fly during computation
+        This serves to print computational info on the fly during computation
         """
         if self.saveresult:
             for key in self.tcomp.keys():
@@ -1555,7 +3106,7 @@ class igm:
 
     def print_all_comp_info(self):
         """
-            This serves to print computational info report
+        This serves to print computational info report
         """
 
         print("Computational statistics report:")
@@ -1612,7 +3163,7 @@ class igm:
             self.update_iceflow()
 
             self.update_ncdf_ex()
-            
+
             self.update_ncdf_ts()
 
             if self.config.vel3d_active:
@@ -1623,7 +3174,7 @@ class igm:
             while self.t.numpy() < self.config.tend:
 
                 self.tcomp["All"].append(time.time())
-                
+
                 if self.config.vel3d_active:
                     self.update_3dvel()
 
@@ -1641,7 +3192,7 @@ class igm:
                     self.update_topg()
 
                 self.update_ncdf_ex()
-                
+
                 self.update_ncdf_ts()
 
                 self.update_plot()
@@ -1652,6 +3203,7 @@ class igm:
                 self.tcomp["All"][-1] *= -1
 
         self.print_all_comp_info()
+
 
 ####################################################################################
 ####################################################################################
