@@ -1066,17 +1066,17 @@ class igm:
                 self.tcomp["Erosion"] = []
                 self.already_called_update_topg = True
 
-            if (self.t - self.tlast_erosion) >= self.config.erosion_update_freq:
+            if (self.t.numpy() - self.tlast_erosion) >= self.config.erosion_update_freq:
 
                 if self.config.verbosity == 1:
-                    print("Erode bedrock at time : ", self.t)
+                    print("Erode bedrock at time : ", self.t.numpy())
 
                 self.tcomp["Erosion"].append(time.time())
 
                 self.velbase_mag = self.getmag(self.uvelbase, self.vvelbase)
 
                 dtopg = (
-                    (self.t - self.tlast_erosion)
+                    (self.t.numpy() - self.tlast_erosion)
                     * self.config.erosion_cst
                     * (self.velbase_mag ** self.config.erosion_exp)
                 )
@@ -1087,7 +1087,7 @@ class igm:
 
                 self.usurf.assign(self.topg + self.thk)
 
-                self.tlast_erosion = self.t
+                self.tlast_erosion = self.t.numpy()
 
                 self.tcomp["Erosion"][-1] -= time.time()
                 self.tcomp["Erosion"][-1] *= -1
