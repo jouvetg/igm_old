@@ -33,3 +33,4 @@ I'm currently seeking for students (at Master or PhD level) to develop IGM. If y
 
 Feel free to drop me an email for any questions, bug reports, or ideas of model extension: guillaume.jouvet at unil.ch
 
+T
