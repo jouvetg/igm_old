@@ -3,9 +3,7 @@
 
 # Notice 
 
-IGM is a very young code, which has been shortly distributed after the publication of our [paper](https://www.doi.org/10.1017/jog.2021.120) in Journal of Glaciology. More features will come in the next months (e.g., data assimilation). IGM is in a preliminary phase, which aims to illustrate its capacities with simple examples and get feedback from the community. If you have ideas of extensions or applications, you would like to contribute, please contact me first at guillaume.jouvet at unil.ch.
-
-NEW: PhD position in [deep learning-aided glacier modelling](https://career5.successfactors.eu/career?career%5fns=job%5flisting&company=universitdP&navBarLevel=JOB%5fSEARCH&rcm%5fsite%5flocale=en%5fUS&career_job_req_id=19184&selected_lang=en_US&jobAlertController_jobAlertId=&jobAlertController_jobAlertName=&browserTimeZone=Europe/Zurich&_s.crb=yIvxSBQs%2bkpJEU1X4gyBhx6H60O6OKV%2fQFehn7pkJd0%3d).
+IGM is a very young code, which has been shortly distributed after the publication of our [paper](https://www.doi.org/10.1017/jog.2021.120) in Journal of Glaciology. More features will come in the next months (e.g., data assimilation). IGM is in a preliminary phase, which aims to illustrate its capacities with simple examples and get feedback from the community. If you have ideas of extensions or applications, you would like to contribute, please contact me at guillaume.jouvet at unil.ch.
 
 # Overview   
 
