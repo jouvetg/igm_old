@@ -1,0 +1,29 @@
+
+### <h1 align="center" id="title">Ice Flow Emulator</h1>
+
+# Model
+
+The Parrallel Ice Sheet Model (PISM) with SIA+SSA
+
+# Training glaciers (dataset pism_isoth_2000)
+
+5 synthetic large icefields using ice-free existing topographies (see the paper below)
+
+# Emulated mapping
+
+(thk,slopsurfx,slopsurfy) -> (ubar,vbar)
+
+# Resolutions
+
+Native 2000 m
+
+# Reference
+
+	@article{IGM,
+	  author       = "G. Jouvet, G. Cordonnier, B. Kim, M. Luethi, A. Vieli, A. Aschwanden",  
+	  title        = "Deep learning speeds up ice flow modelling by several orders of magnitude",
+	  journal      = "Journal of Glaciology",
+	  year         = 2021,
+	}
+
+
