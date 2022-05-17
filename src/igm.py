@@ -60,6 +60,10 @@ class igm:
         self.parser = argparse.ArgumentParser(description="IGM")
         self.read_config_param()
         self.config = self.parser.parse_args()
+        
+        config = tf.compat.v1.ConfigProto()
+        config.gpu_options.allow_growth = True
+        session = tf.compat.v1.Session(config=config)
 
     def read_config_param(self):
 
@@ -294,6 +298,9 @@ class igm:
             self.slidingco = tf.Variable(
                 tf.ones_like(self.thk) * self.config.init_slidingco
             )
+            
+        if self.config.erosion_include:
+            self.dtopgdt = tf.Variable( tf.zeros_like(self.thk) )
 
         self.X, self.Y = tf.meshgrid(self.x, self.y)
 
@@ -329,6 +336,7 @@ class igm:
             "arrhenius + 10 * slidingco",
             "MPa$^{-3}$ a$^{-1}$",
         ]
+        self.var_info["dtopgdt"] = ["Erosion rate","m/y"]
         self.var_info["arrhenius"] = ["Arrhenius factor", "MPa$^{-3}$ a$^{-1}$"]
         self.var_info["slidingco"] = ["Sliding Coefficient", "km MPa$^{-3}$ a$^{-1}$"]
         self.var_info["meantemp"] = ["Mean anual surface temperatures", "°C"]
@@ -1036,14 +1044,15 @@ class igm:
         self.parser.add_argument(
             "--erosion_cst",
             type=float,
-            default=5.2 * 10 ** (-11),
-            help="from Koppes et al., 2015, unit is (m/y)**(1-l)",
+            default=2.7 * 10 ** (-7),
+            help="Herman, F. et al. Erosion by an Alpine glacier. Science 350, 193–195 (2015)",
         )
+
         self.parser.add_argument(
             "--erosion_exp",
             type=float,
-            default=2.34,
-            help="from Koppes et al., 2015",
+            default=2,
+            help="Herman, F. et al. Erosion by an Alpine glacier. Science 350, 193–195 (2015).",
         )
         self.parser.add_argument(
             "--erosion_update_freq",
@@ -1075,15 +1084,11 @@ class igm:
 
                 self.velbase_mag = self.getmag(self.uvelbase, self.vvelbase)
 
-                dtopg = (
-                    (self.t.numpy() - self.tlast_erosion)
-                    * self.config.erosion_cst
-                    * (self.velbase_mag ** self.config.erosion_exp)
-                )
+                self.dtopgdt.assign(self.config.erosion_cst * (self.velbase_mag ** self.config.erosion_exp))
 
-                self.topg.assign(self.topg - dtopg)
+                self.topg.assign(self.topg - (self.t.numpy() - self.tlast_erosion) * self.dtopgdt)
 
-                #                print('max erosion is :', np.max( np.abs ( dtopg ) ) )
+                print('max erosion is :', np.max( np.abs ( self.dtopgdt ) ) )
 
                 self.usurf.assign(self.topg + self.thk)
 

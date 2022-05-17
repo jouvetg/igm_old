@@ -7,7 +7,7 @@ You may find trained and ready-to-use ice flow emulators in the folder `T_M_I_Y_
             "fieldin": ["thk", "slopsurfx", "slopsurfy"],
             "fieldout": ["ubar", "vbar"],
         }
-
+        
         self.mappings["f10"] = {
             "fieldin": ["thk", "slopsurfx", "slopsurfy", "strflowctrl"],
             "fieldout": ["ubar", "vbar"],
@@ -26,6 +26,26 @@ You may find trained and ready-to-use ice flow emulators in the folder `T_M_I_Y_
         self.mappings["f13"] = {
             "fieldin": ["thk", "slopsurfx", "slopsurfy", "arrhenius","slidingco"],
             "fieldout": ["ubar", "vbar", "uvelsurf", "vvelsurf"],
+        }
+
+        self.mappings["f14"] = {
+            "fieldin": ["thk", "slopsurfx", "slopsurfy", "strflowctrl"],
+            "fieldout": ["uvelbase","vvelbase","ubar","vbar","uvelsurf","vvelsurf"],
+        }
+
+        self.mappings["f15"] = {
+            "fieldin": ["thk", "slopsurfx", "slopsurfy", "arrhenius","slidingco"],
+            "fieldout": ["uvelbase","vvelbase","ubar","vbar","uvelsurf","vvelsurf"],
+        }
+        
+        self.mappings["f16"] = {
+            "fieldin": ["thk", "slopsurfx", "slopsurfy", "strflowctrl"],
+            "fieldout": ["uvelbase","vvelbase","ubar","vbar","uvelsurf","vvelsurf"],
+        }
+        
+        self.mappings["f17"] = {
+            "fieldin": ["thk", "slopsurfx", "slopsurfy", "arrhenius","slidingco"],
+            "fieldout": ["uvelbase","vvelbase","wvelbase","ubar","vbar","uvelsurf","vvelsurf","wvelsurf"],
         }
         
         self.mappings["smb"] = {
