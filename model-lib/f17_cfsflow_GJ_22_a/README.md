@@ -18,4 +18,9 @@ Native 100 m.
 
 # Reference
 
-Unpublished
+	@article{IGM2,
+	  author       = "G. Jouvet",  
+	  title        = "Inversion of a Stokes ice flow model emulated by deep learning",
+	  journal      = "Journal of Glaciology",
+	  year         = 2022,
+	}

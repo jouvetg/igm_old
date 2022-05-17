@@ -18,9 +18,9 @@ Native 100 m. Downscaled and upscaled to 200 m and 50 m.
 
 # Reference
 
-	@article{IGM,
-	  author       = "G. Jouvet, G. Cordonnier, B. Kim, M. Luethi, A. Vieli, A. Aschwanden",  
-	  title        = "Deep learning speeds up ice flow modelling by several orders of magnitude",
+	@article{IGM2,
+	  author       = "G. Jouvet",  
+	  title        = "Inversion of a Stokes ice flow model emulated by deep learning",
 	  journal      = "Journal of Glaciology",
-	  year         = 2021,
+	  year         = 2022,
 	}
