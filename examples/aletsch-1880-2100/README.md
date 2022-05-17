@@ -11,10 +11,6 @@ Input files include geological inputs (geology.nc), spatially-varying fields for
 
 # Usage
 
-First copy the igm code or export the PYTHONPATH, 
-
-		cp ../../src/igm.py . # or export PYTHONPATH=../../src/
-	
 Make sure the IGM's dependent libraries ar installed, or activate your igm environment with conda
 
 		conda activate igm

@@ -8,10 +8,6 @@ This set-up permits to simulate the evolution of a cluster of glaciers located a
 Input files include geological inputs (geology.nc) and mass balance inputs for the first case (mb_simple_param.txt).
 
 # Usage
-
-First copy the igm code or export the PYTHONPATH, 
-
-		cp ../../src/igm.py . # or export PYTHONPATH=../../src/
 	
 Make sure the IGM's dependent libraries ar installed, or activate your igm environment with conda
 

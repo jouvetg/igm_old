@@ -20,10 +20,6 @@ Follow the section "Installing Python Packages" on https://github.com/jouvetg/ig
 ... is defined in the folder f12_cfsflow or f17_pismbp_GJ_22_a
 
 # Usage 
-
-First copy the igm code or export the PYTHONPATH, 
-
-		cp ../../src/igm.py . # or export PYTHONPATH=../../src/
 		
 Make sure the IGM's dependent libraries are installed, or activate your igm environment with conda
 
@@ -44,7 +40,8 @@ You may clean behind you after experimenting:
 	@article{IGM-inv,
 	  author       = "G. Jouvet",  
 	  title        = "Inversion of a Stokes ice flow model emulated by deep learning",
-	  journal      = "Submitted",
+	  journal      = "Journal of Glaciology",
+	  year         = 2022,
 	}
 
 	@article{IGM,

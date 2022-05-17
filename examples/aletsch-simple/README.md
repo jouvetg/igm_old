@@ -7,11 +7,7 @@ This set-up permits to simulate the evolution of the Great Aletsch Glacier (Swit
 
 Input files include geological inputs (geology.nc) and mass balance inputs for the first case (mb_simple_param.txt).
 
-# Usage
-
-First copy the igm code or export the PYTHONPATH, 
-
-		cp ../../src/igm.py . # or export PYTHONPATH=../../src/
+# Usage 
 	
 Make sure the IGM's dependent libraries ar installed, or activate your igm environment with conda
 
