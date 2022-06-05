@@ -10,7 +10,7 @@ import numpy as np
 import tensorflow as tf
 import time
 
-from igm import *
+import igm
 from igm_clim_aletsch import *
 from igm_smb_accmelt import *
  
@@ -22,15 +22,14 @@ class igm(igm,igm_clim_aletsch, igm_smb_accmelt):
 igm = igm()
 
 # change parameters
-igm.config.working_dir           = '' 
+igm.config.working_dir           = ''
 igm.config.tstart                = 1880
 igm.config.tend                  = 2100
 igm.config.tsave                 = 1
 igm.config.init_strflowctrl      = 78
 igm.config.cfl                   = 0.25
 
-igm.config.iceflow_model_lib_path= '../../model-lib/f12_cfsflow_GJ_21_a'
-
+igm.config.iceflow_model_lib_path= '../../model-lib/f17_cfsflow_GJ_22_a'
 igm.config.type_climate          = 'aletsch'
 
 # option 1: traditional ams model (acc / melt) -- uncoment these lines
@@ -56,6 +55,8 @@ igm.config.weight_Aletschfirn    = 1.0
 igm.config.weight_Jungfraufirn   = 1.0
 igm.config.weight_Ewigschneefeld = 1.0
 
+# This permits to compute particle trajectories
+igm.config.tracking_particles    = False
 
 # From now, we could have call igm.run(), but we instead give all steps to embed some 
 # features like defining initial surface, or check modelled vs observed top DEM std
@@ -75,16 +76,18 @@ with tf.device(igm.device_name):
     igm.update_climate()
     igm.update_smb()
     igm.update_iceflow()
+    if igm.config.tracking_particles:
+        igm.update_tracking_particles()
     igm.update_ncdf_ex()
     igm.update_ncdf_ts()
     igm.print_info()
-
+    
     while igm.t < igm.config.tend:
         
         igm.tcomp["All"].append(time.time())
              
         # For thes year, check the std between modelled and observed surfaces
-        if igm.t in [1926,1957,1980,1999,2009,2017]:
+        if igm.t in [1880,1926,1957,1980,1999,2009,2017]:
             diff = (igm.usurf-vars(igm)['surf_'+str(int(igm.t))]).numpy()
             diff = diff[igm.thk>1]
             mean  = np.mean(diff)
@@ -92,10 +95,13 @@ with tf.device(igm.device_name):
             vol   = np.sum(igm.thk) * (igm.dx ** 2) / 10 ** 9
             print(" Check modelled vs observed surface at time : %8.0f ; Mean discr. : %8.2f  ;  Std : %8.2f |  Ice volume : %8.2f " \
                   % (igm.t, mean, std, vol) )
-        
+                  
         igm.update_climate()
         igm.update_smb() 
         igm.update_iceflow()
+        if igm.config.tracking_particles:
+            igm.update_tracking_particles()
+            igm.update_write_trajectories()
         igm.update_t_dt()
         igm.update_thk()
         igm.update_ncdf_ex()
