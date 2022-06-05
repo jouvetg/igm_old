@@ -15,6 +15,7 @@ functions are sorted by thema, which are
 #      MASS BALANCE : Simple mass balance
 #      EROSION : Erosion law
 #      TRANSPORT : This handles the mass conservation
+#      TRACKING ; this permits to computa indivudal trajecotties
 #      3DVEL  : This permits to export reconsctruted 3D ice velocity field
 #      OPTI : All for the optimization / data assimilation
 #      PLOT : Plotting functions
@@ -748,7 +749,7 @@ class igm:
             print("Update ICEFLOW at time : ", igm.t)
 
         self.tcomp["Ice flow"].append(time.time())
-
+        
         X = tf.expand_dims(
             tf.stack(
                 [
@@ -1165,7 +1166,171 @@ class igm:
 
         ## Computation of the divergence, final shape is (ny,nx)
         return (Qx[:, 1:] - Qx[:, :-1]) / dx + (Qy[1:, :] - Qy[:-1, :]) / dy
+    
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+    #                               TRACKING
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
 
+    def read_config_param_tracking(self):
+        
+        self.parser.add_argument(
+            "--tracking_particles",
+            type=int,
+            default=True,
+            help="Is the computational of the 3D vel active?",
+        )
+
+        self.parser.add_argument(
+            "--tracking_seeding_update",
+            type=int,
+            default=10,
+            help="Update frequency of tracking",
+        )
+         
+        self.parser.add_argument(
+            "--freq_seeding",
+            type=int,
+            default=5,
+            help="freq_seeding",
+        )
+        
+    def seeding_particles(self):
+    
+        # here we define (xpos,ypos) the horiz coordinate of tracked particles
+        # and rhpos is the relative position in the ice column (scaled bwt 0 and 1)
+                
+        I = (self.thk>10)&(self.smb>-2)&self.gridseed  
+        self.xpos  = tf.Variable(tf.concat([self.xpos,self.X[I]],axis=-1))
+        self.ypos  = tf.Variable(tf.concat([self.ypos,self.Y[I]],axis=-1))
+        self.rhpos = tf.Variable(tf.concat([self.rhpos,tf.ones_like(self.X[I])],axis=-1))
+ 
+    def update_tracking_particles(self):
+        """
+        This function computes efficiently 3D particle trajectories
+        within the ice
+        """
+
+        if self.config.verbosity == 1:
+            print("Update TRACKING at time : ", igm.t)
+            
+        if not hasattr(self, "already_called_update_tracking"):
+            self.already_called_update_tracking = True
+            self.tlast_seeding = -1.0e5000
+            self.tcomp["Tracking"] = []
+            
+            self.xpos   = tf.Variable([])
+            self.ypos   = tf.Variable([])
+            self.rhpos  = tf.Variable([])
+            
+            self.gridseed = (np.zeros_like(self.thk)==1)
+            self.gridseed[::self.config.freq_seeding,::self.config.freq_seeding] = True
+            
+            directory = os.path.join(self.config.working_dir, 'trajectories')
+            if os.path.exists(directory):
+                shutil.rmtree(directory)
+            os.mkdir(directory)
+            
+            self.seedtimes = []
+               
+        if (self.t.numpy() - self.tlast_seeding) >= self.config.tracking_seeding_update:
+            self.seeding_particles()
+            self.tlast_seeding = self.t.numpy()
+            self.seedtimes.append([self.t.numpy(),self.xpos.shape[0]])
+             
+        self.tcomp["Tracking"].append(time.time())
+        
+        i = (self.xpos - self.x[0]) / self.dx
+        j = (self.ypos - self.y[0]) / self.dx
+         
+        indices = tf.expand_dims( tf.concat(
+                       [tf.expand_dims(j, axis=-1), 
+                        tf.expand_dims(i, axis=-1)], 
+                       axis=-1 ), axis=0)
+         
+        import tensorflow_addons as tfa
+ 
+        uvelbase = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.uvelbase, axis=0), axis=-1),
+                    indices,indexing="ij",      )[0, :, 0]
+        
+        vvelbase = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.vvelbase, axis=0), axis=-1),
+                    indices,indexing="ij",      )[0, :, 0]
+        
+        wvelbase = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.wvelbase, axis=0), axis=-1),
+                    indices,indexing="ij",      )[0, :, 0]
+        
+        uvelsurf = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.uvelsurf, axis=0), axis=-1),
+                    indices,indexing="ij",      )[0, :, 0]
+        
+        vvelsurf = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.vvelsurf, axis=0), axis=-1),
+                    indices,indexing="ij",      )[0, :, 0]
+        
+        wvelsurf = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.wvelsurf, axis=0), axis=-1),
+                    indices,indexing="ij",      )[0, :, 0]
+        
+        othk = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.thk, axis=0), axis=-1),
+                    indices,indexing="ij",      )[0, :, 0]
+        
+        smb = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.smb, axis=0), axis=-1),
+                    indices,indexing="ij",      )[0, :, 0]
+         
+        nthk = othk+smb*self.dt # new ice thicnkess after smb update
+
+        # adjust the relative height within the ice column with smb
+        self.rhpos.assign(tf.where(nthk>0.1,
+                                   tf.clip_by_value(self.rhpos*othk/nthk,0,1),
+                                   1))
+        
+        uvel = uvelbase + (uvelsurf - uvelbase)*(1 - (1 - self.rhpos)**4) # SIA-like
+        vvel = vvelbase + (vvelsurf - vvelbase)*(1 - (1 - self.rhpos)**4) # SIA-like
+        wvel = wvelbase + (wvelsurf - wvelbase)*(1 - (1 - self.rhpos)**4) # SIA-like
+         
+        self.xpos.assign( self.xpos + self.dt*uvel ) # forward euler
+        self.ypos.assign( self.ypos + self.dt*vvel ) # forward euler
+
+        # adjust the relative height within the ice column with the verticial velocity
+        self.rhpos.assign(tf.where(nthk>0.1,
+                                    tf.clip_by_value((self.rhpos*nthk+self.dt*wvel)/nthk,0,1),
+                                    1))
+
+        self.tcomp["Tracking"][-1] -= time.time()
+        self.tcomp["Tracking"][-1] *= -1
+        
+    def update_write_trajectories(self):
+        
+        if self.saveresult:
+        
+            for i in range(len(self.seedtimes)):
+                
+                yearseed = self.seedtimes[i][0]
+                i0=0
+                if i>0:
+                    i0 = self.seedtimes[i-1][1]
+                i1     = self.seedtimes[i][1]
+            
+                filename="x-"+str(int(yearseed))+".dat"
+                with open(os.path.join(self.config.working_dir, 'trajectories', filename), 'a') as f:
+                    print( *list(np.concatenate([[self.t.numpy()],self.xpos[i0:i1].numpy()],axis=0)), file=f )
+                    
+                filename="y-"+str(int(yearseed))+".dat"
+                with open(os.path.join(self.config.working_dir, 'trajectories', filename), 'a') as f:
+                    print( *list(np.concatenate([[self.t.numpy()],self.ypos[i0:i1].numpy()],axis=0)), file=f )
+                    
+                filename="z-"+str(int(yearseed))+".dat"
+                with open(os.path.join(self.config.working_dir, 'trajectories', filename), 'a') as f:
+                    print( *list(np.concatenate([[self.t.numpy()],self.rhpos[i0:i1].numpy()],axis=0)), file=f )
+   
     ####################################################################################
     ####################################################################################
     ####################################################################################
@@ -2519,6 +2684,10 @@ class igm:
         varori.remove("y")
         if not "strflowctrl" in varori:
             varori.append("strflowctrl")
+        if not "arrhenius" in varori:
+            varori.append("arrhenius")
+        if not "slidingco" in varori:
+            varori.append("slidingco")
         if not "thk" in varori:
             varori.append("thk")
         if not "usurf" in varori:
@@ -2930,6 +3099,8 @@ class igm:
 
             if self.config.varplot == "velbar_mag":
                 self.velbar_mag = self.getmag(self.ubar, self.vbar)
+                
+
 
             if firstime:
 
@@ -2943,6 +3114,12 @@ class igm:
                     vmin=0,
                     vmax=self.config.varplot_max,
                 )
+                if self.config.tracking_particles:
+                    r=1
+                    self.ip = self.ax.scatter(x=(self.xpos[::r]-self.x[0])/self.dx, \
+                                              y=(self.ypos[::r]-self.y[0])/self.dx, \
+                                              c=1-self.rhpos[::r].numpy(), vmin=0, vmax=1, \
+                                              s=0.5, cmap="RdBu")
                 self.ax.set_title("YEAR : " + str(self.t.numpy()), size=15)
                 self.cbar = plt.colorbar(im)
 
@@ -2954,6 +3131,13 @@ class igm:
                     vmin=0,
                     vmax=self.config.varplot_max,
                 )
+                if self.config.tracking_particles:
+                    self.ip.set_visible(False)
+                    r=1
+                    self.ip = self.ax.scatter(x=(self.xpos[::r]-self.x[0])/self.dx, \
+                                              y=(self.ypos[::r]-self.y[0])/self.dx, \
+                                              c=1-self.rhpos[::r].numpy(), vmin=0, vmax=1, \
+                                              s=0.5, cmap="RdBu")
                 self.ax.set_title("YEAR : " + str(self.t.numpy()), size=15)
 
             if self.config.plot_live:
@@ -3166,6 +3350,9 @@ class igm:
                 self.optimize()
 
             self.update_iceflow()
+            
+            if self.config.tracking_particles:
+                self.update_tracking_particles()
 
             self.update_ncdf_ex()
 
@@ -3188,6 +3375,10 @@ class igm:
                 self.update_smb()
 
                 self.update_iceflow()
+                
+                if self.config.tracking_particles:
+                    self.update_tracking_particles()
+                    self.update_write_trajectories()
 
                 self.update_t_dt()
 

@@ -10,7 +10,7 @@ Stokes-based glacier model CfsFlow (Jouvet and others, 2008)
 
 # Emulated mapping
 
-(thk,slopsurfx,slopsurfy,arrhenius,slidingco) -> (uvelbase,vvelbase,ubar,vbar,uvelsurf,vvelsurf)
+(thk,slopsurfx,slopsurfy,arrhenius,slidingco) -> (uvelbase,vvelbase,wvelbase,ubar,vbar,uvelsurf,vvelsurf,wvelsurf)
 
 # Resolutions
 

@@ -10,7 +10,7 @@ The Parrallel Ice Sheet Model (PISM), version 2, with Blatter Pattyn Solver
 
 # Emulated mapping
 
-(thk,slopsurfx,slopsurfy,arrhenius,slidingco) -> (uvelbase,vvelbase,ubar,vbar,uvelsurf,vvelsurf)
+(thk,slopsurfx,slopsurfy,arrhenius,slidingco) -> (uvelbase,vvelbase,wvelbase,ubar,vbar,uvelsurf,vvelsurf,wvelsurf)
 
 # Resolutions
 
