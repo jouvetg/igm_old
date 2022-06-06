@@ -1442,28 +1442,30 @@ class igm:
         for k in range(0, self.height.shape[0]):
             U.append(self.uvelbase + fshear[k] * (self.uvelsurf - self.uvelbase))
             V.append(self.vvelbase + fshear[k] * (self.vvelsurf - self.vvelbase))
+            W.append(self.vvelbase + fshear[k] * (self.wvelsurf - self.wvelbase))
 
         self.U.assign(tf.stack(U, axis=0))
         self.V.assign(tf.stack(V, axis=0))
+        self.W.assign(tf.stack(W, axis=0))
 
-        Ui = tf.pad(self.U, [[0, 0], [0, 0], [1, 1]], "SYMMETRIC")
-        Vj = tf.pad(self.V, [[0, 0], [1, 1], [0, 0]], "SYMMETRIC")
+        # Ui = tf.pad(self.U, [[0, 0], [0, 0], [1, 1]], "SYMMETRIC")
+        # Vj = tf.pad(self.V, [[0, 0], [1, 1], [0, 0]], "SYMMETRIC")
 
         ######### THis methods reconstruct the vertical velocity using divflux,
         ######### and assuming a SIA-like profile like x- and y- components
 
-        slopsurfx, slopsurfy = self.compute_gradient_tf(self.usurf, self.dx, self.dx)
-        sloptopgx, sloptopgy = self.compute_gradient_tf(self.topg, self.dx, self.dx)
+        # slopsurfx, slopsurfy = self.compute_gradient_tf(self.usurf, self.dx, self.dx)
+        # sloptopgx, sloptopgy = self.compute_gradient_tf(self.topg, self.dx, self.dx)
 
-        divflux = self.compute_divflux(self.ubar, self.vbar, self.thk, self.dx, self.dx)
+        # divflux = self.compute_divflux(self.ubar, self.vbar, self.thk, self.dx, self.dx)
 
-        self.wvelbase = self.uvelbase * sloptopgx + self.vvelbase * sloptopgy
-        self.wvelsurf = -divflux + self.uvelsurf * slopsurfx + self.vvelsurf * slopsurfy
+        # self.wvelbase = self.uvelbase * sloptopgx + self.vvelbase * sloptopgy
+        # self.wvelsurf = -divflux + self.uvelsurf * slopsurfx + self.vvelsurf * slopsurfy
 
-        for k in range(0, self.height.shape[0]):
-            W.append(self.wvelbase + fshear[k] * (self.wvelsurf - self.wvelbase))
+        # for k in range(0, self.height.shape[0]):
+        #     W.append(self.wvelbase + fshear[k] * (self.wvelsurf - self.wvelbase))
 
-        self.W.assign(tf.stack(W, axis=0))
+        # self.W.assign(tf.stack(W, axis=0))
 
         ### This methods integrates the imcompressiblity conditoons
 
