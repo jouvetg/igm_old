@@ -1199,10 +1199,15 @@ class igm:
         )
         
     def seeding_particles(self):
-    
-        # here we define (xpos,ypos) the horiz coordinate of tracked particles
-        # and rhpos is the relative position in the ice column (scaled bwt 0 and 1)
+        """
+        here we define (xpos,ypos) the horiz coordinate of tracked particles
+        and rhpos is the relative position in the ice column (scaled bwt 0 and 1)
                 
+        here we seed only the accum. area (a bit more), where there is 
+        significant ice, and in some points of a regular grid self.gridseed
+        (density defined by freq_seeding)
+        """
+
         I = (self.thk>10)&(self.smb>-2)&self.gridseed  
         self.xpos  = tf.Variable(tf.concat([self.xpos,self.X[I]],axis=-1))
         self.ypos  = tf.Variable(tf.concat([self.ypos,self.Y[I]],axis=-1))
@@ -1222,10 +1227,12 @@ class igm:
             self.tlast_seeding = -1.0e5000
             self.tcomp["Tracking"] = []
             
+            # initialize trajectories
             self.xpos   = tf.Variable([])
             self.ypos   = tf.Variable([])
             self.rhpos  = tf.Variable([])
             
+            # build the gridseed
             self.gridseed = (np.zeros_like(self.thk)==1)
             self.gridseed[::self.config.freq_seeding,::self.config.freq_seeding] = True
             
@@ -1243,6 +1250,8 @@ class igm:
              
         self.tcomp["Tracking"].append(time.time())
         
+        # find the indices of trajectories
+        # these indicies are real values to permit 2D interpolations
         i = (self.xpos - self.x[0]) / self.dx
         j = (self.ypos - self.y[0]) / self.dx
          
