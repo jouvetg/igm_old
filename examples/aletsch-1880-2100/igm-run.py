@@ -25,7 +25,7 @@ igm = igm()
 igm.config.working_dir           = ''
 igm.config.tstart                = 1880
 igm.config.tend                  = 2100
-igm.config.tsave                 = 1
+igm.config.tsave                 = 5
 igm.config.init_strflowctrl      = 78
 igm.config.cfl                   = 0.25
 
@@ -56,7 +56,9 @@ igm.config.weight_Jungfraufirn   = 1.0
 igm.config.weight_Ewigschneefeld = 1.0
 
 # This permits to compute particle trajectories
-igm.config.tracking_particles    = False
+igm.config.tracking_particles      = False # activate particle tracking
+igm.config.tracking_seeding_update = 10    # we seed every 10 years
+igm.config.freq_seeding            = 5     # we seed each 5 point of the 2D grid
 
 # From now, we could have call igm.run(), but we instead give all steps to embed some 
 # features like defining initial surface, or check modelled vs observed top DEM std

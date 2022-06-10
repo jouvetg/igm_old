@@ -1270,20 +1270,12 @@ class igm:
                     tf.expand_dims(tf.expand_dims(self.vvelbase, axis=0), axis=-1),
                     indices,indexing="ij",      )[0, :, 0]
         
-        wvelbase = tfa.image.interpolate_bilinear(
-                    tf.expand_dims(tf.expand_dims(self.wvelbase, axis=0), axis=-1),
-                    indices,indexing="ij",      )[0, :, 0]
-        
         uvelsurf = tfa.image.interpolate_bilinear(
                     tf.expand_dims(tf.expand_dims(self.uvelsurf, axis=0), axis=-1),
                     indices,indexing="ij",      )[0, :, 0]
         
         vvelsurf = tfa.image.interpolate_bilinear(
                     tf.expand_dims(tf.expand_dims(self.vvelsurf, axis=0), axis=-1),
-                    indices,indexing="ij",      )[0, :, 0]
-        
-        wvelsurf = tfa.image.interpolate_bilinear(
-                    tf.expand_dims(tf.expand_dims(self.wvelsurf, axis=0), axis=-1),
                     indices,indexing="ij",      )[0, :, 0]
         
         othk = tfa.image.interpolate_bilinear(
@@ -1303,15 +1295,21 @@ class igm:
         
         uvel = uvelbase + (uvelsurf - uvelbase)*(1 - (1 - self.rhpos)**4) # SIA-like
         vvel = vvelbase + (vvelsurf - vvelbase)*(1 - (1 - self.rhpos)**4) # SIA-like
-        wvel = wvelbase + (wvelsurf - wvelbase)*(1 - (1 - self.rhpos)**4) # SIA-like
          
         self.xpos.assign( self.xpos + self.dt*uvel ) # forward euler
         self.ypos.assign( self.ypos + self.dt*vvel ) # forward euler
 
+        # THIS WAS IMPLMENTED BY MISTAKE BEFORE; WE NO LONGER USE THE VERTICAL VELOCITY
         # adjust the relative height within the ice column with the verticial velocity
-        self.rhpos.assign(tf.where(nthk>0.1,
-                                    tf.clip_by_value((self.rhpos*nthk+self.dt*wvel)/nthk,0,1),
-                                    1))
+        # self.rhpos.assign(tf.where(nthk>0.1,
+        #                             tf.clip_by_value((self.rhpos*nthk+self.dt*wvel)/nthk,0,1),
+        #                             1))
+        
+                                     
+        indices = tf.concat( [tf.expand_dims(tf.cast(j,dtype='int32'), axis=-1), 
+                               tf.expand_dims(tf.cast(i,dtype='int32'), axis=-1)], axis=-1 )
+        updates = tf.cast(tf.where(self.rhpos==1,1,0),dtype='float32')
+        self.nbofsurfparticles = tf.tensor_scatter_nd_add( tf.zeros_like( self.thk ) , indices, updates)
 
         self.tcomp["Tracking"][-1] -= time.time()
         self.tcomp["Tracking"][-1] *= -1
