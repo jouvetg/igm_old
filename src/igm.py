@@ -1206,13 +1206,29 @@ class igm:
         here we seed only the accum. area (a bit more), where there is 
         significant ice, and in some points of a regular grid self.gridseed
         (density defined by freq_seeding)
+        
         """
+        
+#        This will serve to remove imobile particles, but it is not active yet.
+
+#        indices = tf.expand_dims( tf.concat(
+#                       [tf.expand_dims((self.ypos - self.y[0]) / self.dx, axis=-1), 
+#                        tf.expand_dims((self.xpos - self.x[0]) / self.dx, axis=-1)], 
+#                       axis=-1 ), axis=0)
+         
+#        import tensorflow_addons as tfa
+   
+#        thk = tfa.image.interpolate_bilinear(
+#                    tf.expand_dims(tf.expand_dims(self.thk, axis=0), axis=-1),
+#                    indices,indexing="ij",      )[0, :, 0]
+                   
+#        J = (thk>1)
 
         I = (self.thk>10)&(self.smb>-2)&self.gridseed  
         self.xpos  = tf.Variable(tf.concat([self.xpos,self.X[I]],axis=-1))
         self.ypos  = tf.Variable(tf.concat([self.ypos,self.Y[I]],axis=-1))
         self.rhpos = tf.Variable(tf.concat([self.rhpos,tf.ones_like(self.X[I])],axis=-1))
- 
+         
     def update_tracking_particles(self):
         """
         This function computes efficiently 3D particle trajectories
