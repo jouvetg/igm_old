@@ -1185,17 +1185,17 @@ class igm:
         )
 
         self.parser.add_argument(
-            "--tracking_seeding_update",
+            "--frequency_seeding",
             type=int,
             default=10,
             help="Update frequency of tracking",
         )
          
         self.parser.add_argument(
-            "--freq_seeding",
+            "--density_seeding",
             type=int,
-            default=5,
-            help="freq_seeding",
+            default=0.2,
+            help="density_seeding",
         )
         
     def seeding_particles(self):
@@ -1205,7 +1205,7 @@ class igm:
                 
         here we seed only the accum. area (a bit more), where there is 
         significant ice, and in some points of a regular grid self.gridseed
-        (density defined by freq_seeding)
+        (density defined by density_seeding)
         
         """
         
@@ -1250,7 +1250,8 @@ class igm:
             
             # build the gridseed
             self.gridseed = (np.zeros_like(self.thk)==1)
-            self.gridseed[::self.config.freq_seeding,::self.config.freq_seeding] = True
+            rr = int(1.0/self.config.density_seeding)
+            self.gridseed[::rr,::rr] = True
             
             directory = os.path.join(self.config.working_dir, 'trajectories')
             if os.path.exists(directory):
@@ -1259,7 +1260,7 @@ class igm:
             
             self.seedtimes = []
                
-        if (self.t.numpy() - self.tlast_seeding) >= self.config.tracking_seeding_update:
+        if (self.t.numpy() - self.tlast_seeding) >= self.config.frequency_seeding:
             self.seeding_particles()
             self.tlast_seeding = self.t.numpy()
             self.seedtimes.append([self.t.numpy(),self.xpos.shape[0]])
