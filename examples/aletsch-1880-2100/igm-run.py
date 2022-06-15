@@ -18,6 +18,18 @@ from igm_smb_accmelt import *
 class igm(igm,igm_clim_aletsch, igm_smb_accmelt):
     pass
 
+# add custum seeding function, to seeding in the "seeding" area defined in geology.nc
+class igm(igm):
+    def seeding_particles(self):
+        # here we seed where i) thickness is higher than 1 m
+        #                    ii) the seeding field of geology.nc is active
+        #                    iii) on the gridseed (which permit to control the seeding density)
+        I = (self.thk>1)&(self.seeding>0.5)&self.gridseed  # here you may redefine how you want to seed particles
+        self.nxpos  = self.X[I]                # x position of the particle
+        self.nypos  = self.Y[I]                # y position of the particle
+        self.nrhpos = tf.ones_like(self.X[I])  # relative position in the ice column
+        self.nwpos  = tf.ones_like(self.X[I])  # this is the weight of the particle
+
 # define the igm class
 igm = igm()
 
@@ -25,7 +37,7 @@ igm = igm()
 igm.config.working_dir           = ''
 igm.config.tstart                = 1880
 igm.config.tend                  = 2100
-igm.config.tsave                 = 5
+igm.config.tsave                 = 1
 igm.config.init_strflowctrl      = 78
 igm.config.cfl                   = 0.25
 
@@ -56,9 +68,9 @@ igm.config.weight_Jungfraufirn   = 1.0
 igm.config.weight_Ewigschneefeld = 1.0
 
 # This permits to compute particle trajectories
-igm.config.tracking_particles      = False # activate particle tracking
-igm.config.tracking_seeding_update = 1000    # we seed every 10 years
-igm.config.freq_seeding            = 2    # we seed each 5 point of the 2D grid
+igm.config.tracking_particles      = False  # activate particle tracking
+igm.config.frequency_seeding       = 2    # we seed every 10 years
+igm.config.density_seeding         = 0.2   # we seed each 5 point of the 2D grid
 
 # From now, we could have call igm.run(), but we instead give all steps to embed some 
 # features like defining initial surface, or check modelled vs observed top DEM std
@@ -115,3 +127,12 @@ with tf.device(igm.device_name):
         igm.tcomp["All"][-1] *= -1
         
     igm.print_all_comp_info()
+
+
+# Uncomment this to watch the density/weight of debris
+# fig, ax = plt.subplots(1,1,figsize=(8,8),dpi=200) 
+# im= plt.imshow(igm.weight_particles,origin='lower',vmax=5);  
+# cbar = fig.colorbar(im,  orientation="vertical")
+# cbar.set_label(label='Density of debris' ,fontsize=12)
+# cbar.ax.tick_params(labelsize=12)
+# ax.axis('off')

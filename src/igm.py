@@ -3,9 +3,10 @@
 """
 Copyright (C) 2021-2022 Guillaume Jouvet <guillaume.jouvet@geo.uzh.ch>
 Published under the GNU GPL (Version 3), check at the LICENSE file
+"""
 
-This file contains the core functions the Instructed Glacier Model (IGM),
-functions are sorted by thema, which are
+# This file contains the core functions the Instructed Glacier Model (IGM),
+# functions are sorted by thema, which are
 
 #      INITIALIZATION : contains all to initialize variables
 #      I/O NCDF : Files for data Input/Output using NetCDF file format
@@ -21,8 +22,6 @@ functions are sorted by thema, which are
 #      PLOT : Plotting functions
 #      PRINT INFO : handle the printing of output during computation
 #      RUN : the main function that wrap all functions within an time-iterative loop
-
-"""
 
 ####################################################################################
 
@@ -1224,10 +1223,11 @@ class igm:
                    
 #        J = (thk>1)
 
-        I = (self.thk>10)&(self.smb>-2)&self.gridseed  
-        self.xpos  = tf.Variable(tf.concat([self.xpos,self.X[I]],axis=-1))
-        self.ypos  = tf.Variable(tf.concat([self.ypos,self.Y[I]],axis=-1))
-        self.rhpos = tf.Variable(tf.concat([self.rhpos,tf.ones_like(self.X[I])],axis=-1))
+        I = (self.thk>10)&(self.smb>-2)&self.gridseed
+        self.nxpos  = self.X[I]
+        self.nypos  = self.Y[I]
+        self.nrhpos = tf.ones_like(self.X[I])
+        self.nwpos  = tf.ones_like(self.X[I])
          
     def update_tracking_particles(self):
         """
@@ -1247,6 +1247,7 @@ class igm:
             self.xpos   = tf.Variable([])
             self.ypos   = tf.Variable([])
             self.rhpos  = tf.Variable([])
+            self.wpos   = tf.Variable([])
             
             # build the gridseed
             self.gridseed = (np.zeros_like(self.thk)==1)
@@ -1262,6 +1263,13 @@ class igm:
                
         if (self.t.numpy() - self.tlast_seeding) >= self.config.frequency_seeding:
             self.seeding_particles()
+            
+            # merge the new seeding points with the former ones
+            self.xpos  = tf.Variable(tf.concat([self.xpos,self.nxpos],axis=-1))
+            self.ypos  = tf.Variable(tf.concat([self.ypos,self.nypos],axis=-1))
+            self.rhpos = tf.Variable(tf.concat([self.rhpos,self.nrhpos],axis=-1))
+            self.wpos  = tf.Variable(tf.concat([self.wpos,self.nwpos],axis=-1))
+            
             self.tlast_seeding = self.t.numpy()
             self.seedtimes.append([self.t.numpy(),self.xpos.shape[0]])
              
@@ -1325,8 +1333,8 @@ class igm:
                                      
         indices = tf.concat( [tf.expand_dims(tf.cast(j,dtype='int32'), axis=-1), 
                                tf.expand_dims(tf.cast(i,dtype='int32'), axis=-1)], axis=-1 )
-        updates = tf.cast(tf.where(self.rhpos==1,1,0),dtype='float32')
-        self.nbofsurfparticles = tf.tensor_scatter_nd_add( tf.zeros_like( self.thk ) , indices, updates)
+        updates = tf.cast(tf.where(self.rhpos==1,self.wpos,0),dtype='float32')
+        self.weight_particles = tf.tensor_scatter_nd_add( tf.zeros_like( self.thk ) , indices, updates)
 
         self.tcomp["Tracking"][-1] -= time.time()
         self.tcomp["Tracking"][-1] *= -1
@@ -1778,6 +1786,10 @@ class igm:
             default=50,
             help="Frequency of the output for the optimization",
         )
+        self.parser.add_argument(
+            "--geology_optimized_file", type=str, default="geology-optimized.nc", help="Geology input file"
+        )
+
 
     def make_data_holes(self):
         """
@@ -2737,13 +2749,8 @@ class igm:
             self.thk > 1.0, tf.ones_like(self.thk), tf.zeros_like(self.thk)
         )
 
-        if os.path.isfile(os.path.join(self.config.working_dir, "geology.nc")):
-            filename = "geology-optimized.nc"
-        else:
-            filename = "geology.nc"
-
         nc = Dataset(
-            os.path.join(self.config.working_dir, filename),
+            os.path.join(self.config.working_dir, self.config.geology_optimized_file),
             "w",
             format="NETCDF4",
         )
