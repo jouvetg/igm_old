@@ -33,7 +33,7 @@ where $\mathcal{C}^s$ is the misfit between the modeled and observed top ice sur
 $$ \mathcal{C}^s = \int_{\Omega} \frac{1}{2 \sigma_s^2}  \left| s - s^{obs}  \right|^2,$$
 
 where $\mathcal{C}^{d}$ is a misfit term between the flux divergence $\nabla \cdot (h {\bar{\bf u}})$ and its polynomial 
-regression $d$ with respect to the ice surface elevation $s(x,y)$ to enforce smoothness with linear dependence to $s$:
+regression $d$ with respect to the ice surface elevation $s(x,y)$ to enforce smoothness with  dependence to $s$:
 $$ \mathcal{C}^{d} = \int_{\Omega} \frac{1}{2 \sigma_d^2} \left| \nabla \cdot (h {\bar{\bf u}}) - d  \right|^2, $$
 
 where $\mathcal{R}^h$ is a regularization term to enforce anisotropic smoothness and convexity of $h$:
