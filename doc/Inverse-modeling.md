@@ -18,13 +18,13 @@ Of course, you may not have all these data, which is fine. It is possible to kee
 
 All the data need to be assemblied in 2D raster grid in an netcdf observation.nc file using convention variable names but ending with 'obs'. E.g. observation.nc contains fields 'usurfobs' (observed top surface elevation), thkobs (observed thickness profiles, use nan or novalue where no data is available), icemaskobs (this mask from RGI outline serve to enforce zero ice thickness outside the mask), uvelsurfobs and vvelsurfobs (x- and y- components of the horizontal surface ice velocity, use nan or novalue where no data is available), thkinit (this is a formerly inferred ice thickness field that may be used to initalize the inverse model, otherwise it would start from thk=0).
 
-# Asumption on the ice flow control
+# Asumption on the ice flow control (if needed)
 
 Optimizing for both Arrhenius factor ($A$) and sliding coefficient ($c$) would lead to multiple solutions as several combination of the two may explain the observed ice flow similarly. To deal with this issue, we introduce a single control of the ice flow strenght (named as strflowctrl in IGM) $\tilde{A} = A + \lambda c$, where $A$ is the Arrhenius factor that controls the ice shearing from cold-ice case (low $A$) to temperate ice case ($A=78$ MPa$^{-3}$ a$^{-1}$), $c$ is a sliding coefficient that controls the strength of basal motion from no sliding ($c=0$) to high sliding (high $c$) and $\lambda=1$ km$^{-1}$ is a given parameter. 
 
 ![](https://github.com/jouvetg/igm/blob/main/fig/strflowctrl.png)
 
-# Set-up the inverse model (cost function to minimize)
+# Set-up the inverse model  
 
 The optimization problem consists of finding spatially varying fields ($h$, $\tilde{A}$, $s$) that minimize the cost function
 $$ \mathcal{J}(h,\tilde{A},s) = \mathcal{C}^u + \mathcal{C}^h + \mathcal{C}^s + \mathcal{C}^{d} + \mathcal{R}^h +  \mathcal{R}^{\tilde{A}}, $$
@@ -64,6 +64,54 @@ igm.config.opti_cost=['velsurf','icemask']  # In this case, you only fit surface
 ```
 Make sure you have a balance between controls and constraints to ensure the problem to have a unique solution.
 
+# Exploring parameters
+
+There are quite a lot of parameters that may need to be tuned for each applications. First, you may change confidence levels
+$\sigma^u$, $\sigma^h$, $\sigma^s$, $\sigma^d$ to fit surface ice velocity, ice thickness, surface top elevation, or divergence of the flux. You may change these parameters as follows:
+
+```python
+igm.config.opti_velsurfobs_std = 5 # unit m/y
+igm.config.opti_thkobs_std     = 5 # unit m
+igm.config.opti_usurfobs_std   = 5 # unit m
+igm.config.opti_divfluxobs_std = 1 # unit m/y
+```
+Then you may change regularization terms such as $\alpha_h$ and $\alpha_{\tilde{A}}$, which control the weight of regularizations, $\beta$ controls the smoothing anisotropy (we force further smoothness along the flow than across flow) \item $\gamma$ is a convexity parameter helping convergence as follows
+
+```python 
+--opti_regu_param_thk = 10.0            # weight for the regul. of thk
+--opti_regu_param_strflowctrl = 1.0     # weight for the regul. of strflowctrl
+--opti_smooth_anisotropy_factor = 0.2
+--opti_convexity_weight = 0.002
+```
+ 
+# Runining the optimization
+
+The optimization scheme is implemented in igm function optimize(), calling it for inverse modelling would look like this:
+
+```python 
+import numpy as np
+import tensorflow as tf
+
+import igm
+
+igm = igm() 
+ 
+# change parameters
+igm.config.iceflow_model_lib_path='../../model-lib/f17_pismbp_GJ_22_a' 
+igm.config.opti_control=['thk','strflowctrl','usurf']
+igm.config.opti_cost=['velsurf','thk','usurf','divfluxfcz','icemask']   
+igm.config.opti_usurfobs_std             = 5.0   # Tol to fit top ice surface 
+
+igm.initialize()
+
+with tf.device(igm.device_name):
+    igm.load_ncdf_data(igm.config.observation_file)
+    igm.initialize_fields()
+    igm.initialize_iceflow()
+    igm.optimize()
+    
+igm.print_all_comp_info()
+```
 
 
 # Reference
