@@ -58,8 +58,8 @@ igm.config.weight_ablation       = 1.25
 igm.config.usegpu                = True
 
 igm.config.varplot_max           = 250
-igm.config.plot_result           = True
-igm.config.plot_live             = True
+igm.config.plot_result           = False
+igm.config.plot_live             = False
 
 # This permits to give sme weight to accumaulation bassins
 igm.config.weight_Aletschfirn    = 1.0
@@ -67,7 +67,7 @@ igm.config.weight_Jungfraufirn   = 1.0
 igm.config.weight_Ewigschneefeld = 1.0
 
 # This permits to compute particle trajectories
-igm.config.tracking_particles      = True  # activate particle tracking
+igm.config.tracking_particles      = False  # activate particle tracking
 igm.config.frequency_seeding       = 2    # we seed every 10 years
 igm.config.density_seeding         = 0.2   # we seed each 5 point of the 2D grid
 

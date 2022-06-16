@@ -47,6 +47,11 @@ igm.config.plot_live             = True
 igm.config.varplot_max           = 250
 igm.config.vel3d_active          = False 
 
+# This permits to compute particle trajectories
+igm.config.tracking_particles      = False  # activate particle tracking
+igm.config.frequency_seeding       = 20    # we seed every 10 years
+igm.config.density_seeding         = 0.2   # we seed each 5 point of the 2D grid
+
 igm.config.vars_to_save= [ "topg", "usurf", "thk", "smb", "velbar_mag", "velsurf_mag", 'uvelsurf', 'vvelsurf' ]
  
 igm.run()

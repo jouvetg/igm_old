@@ -45,7 +45,6 @@ igm.initialize()
 with tf.device(igm.device_name):
     igm.load_ncdf_data(igm.config.observation_file)
     igm.initialize_fields()
-    igm.initialize_iceflow()
 
     # smooth the mask fo technical reasons
     from scipy.ndimage import gaussian_filter

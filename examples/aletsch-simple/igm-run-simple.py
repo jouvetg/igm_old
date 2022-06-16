@@ -30,11 +30,6 @@ igm.run()
 
 #     igm.load_ncdf_data(igm.config.geology_file)
 #     igm.initialize_fields()
-#     igm.initialize_iceflow()
-#     igm.update_smb()
-#     igm.update_iceflow()
-#     igm.update_ncdf_ex()
-#     igm.print_info()
 
 #     while igm.t < igm.config.tend:
 #         igm.update_smb()
