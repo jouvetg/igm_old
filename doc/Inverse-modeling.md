@@ -51,22 +51,24 @@ $$ \mathcal{R}^{\tilde{A}} = \alpha_{\tilde{A}} \int_{\Omega} | \nabla  \tilde{A
 where $\mathcal{P}^h$ is a penalty term to enforce nonnegative ice thickness, and zero thickness outside a given mask:
 $$ \mathcal{P}^h  = 10^{10} \times \left( \int_{h<0} h^2 + \int_{\mathcal{M}^{\rm ice-free}} h^2 \right).$$
 
+Check at the reference paper given below for more explanation on the regularization terms.
+
 # Define controls and cost components
 
-The above optimization problem is the most general case, however, you may select only some components as follows: 
+The above optimization problem is given in the most general case, however, you may select only some components according to your data as follows: 
 
 * the list of control variables you wish to optimize, e.g.
 ```python
 igm.config.opti_control=['thk','strflowctrl','usurf'] # this is the most general case  
-igm.config.opti_control=['thk','usurf'] # this will only optimze ice thickness and top surface elevation
-igm.config.opti_control=['thk'] # this will only optimze ice thickness 
+igm.config.opti_control=['thk','usurf'] # this will only optimize ice thickness and top surface elevation
+igm.config.opti_control=['thk'] # this will only optimize ice thickness 
 ```
 * the list of cost components you wish to minimize, e.g.
 ```python
 igm.config.opti_cost=['velsurf','thk','usurf','divfluxfcz','icemask']  # this is the most general case  
 igm.config.opti_cost=['velsurf','icemask']  # In this case, you only fit surface velocity and ice mask.
 ```
-Make sure you have a balance between controls and constraints to ensure the problem to have a unique solution.
+*Make sure you have a balance between controls and constraints to ensure the problem to have a unique solution.*
 
 # Exploring parameters
 
