@@ -12,8 +12,8 @@ igm.config.working_dir           = ''
 #igm.config.iceflow_model_lib_path= '../../model-lib/f12_cfsflow'
 igm.config.iceflow_model_lib_path='../../model-lib/f17_pismbp_GJ_22_a'
  
-#igm.config.plot_result           = True
-#igm.config.plot_live             = True
+igm.config.plot_result           = True
+igm.config.plot_live             = True
 igm.config.observation_file      = 'observation.nc' # this is the main input file
  
 igm.config.opti_output_freq              = 50     # Frequency for output
@@ -29,7 +29,6 @@ igm.config.opti_smooth_anisotropy_factor = 0.2   # Smooth anisotropy factor
 igm.config.opti_usurfobs_std             = 5.0   # Tol to fit top ice surface
 igm.config.opti_velsurfobs_std           = 3.0   # Tol to fit surface speeds
 igm.config.opti_thkobs_std               = 5.0   # Tol to fit ice thk profiles
-igm.config.opti_strflowctrl_std          = 5.0   # Tol to fit strflowctr
 igm.config.opti_divfluxobs_std           = 1.0   # Tol to fit top ice surface
 
 # Uncomment for Optimization scheme O
