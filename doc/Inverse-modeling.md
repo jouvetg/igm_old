@@ -18,6 +18,8 @@ Of course, you may not have all these data, which is fine. You work with a reduc
 
 All the data need to be assemblied in 2D raster grid in an netcdf file (called by default observation.nc) using convention variable names but ending with 'obs'. E.g. observation.nc contains fields 'usurfobs' (observed top surface elevation), 'thkobs' (observed thickness profiles, use nan or novalue where no data is available), 'icemaskobs' (this mask from RGI outline serve to enforce zero ice thickness outside the mask), 'uvelsurfobs' and 'vvelsurfobs' (x- and y- components of the horizontal surface ice velocity, use nan or novalue where no data is available), 'thkinit' (this may be a formerly-inferred ice thickness field to initalize the inverse model, otherwise it would start from thk=0).
 
+**I have prepared the observation file for nearly all glaciers of the world. If you have a region or glacier of interest, feel free to drop me any email at guillaume dot jouvet at unil dot ch with the RGI number of lon/lat coordinates of the region of interest so that I can send you the corresponding observation file.**
+
 # Asumption on the ice flow control
 
 Optimizing for both Arrhenius factor (A) and sliding coefficient (c) would lead to multiple solutions as several combinations of the two may explain the observed ice flow similarly. To deal with this issue, we introduce a single control of the ice flow strenght (named as 'strflowctrl' in IGM) $\tilde{A}$ = A + lambda c, where A is the Arrhenius factor that controls the ice shearing from cold-ice case (low A) to temperate ice case (A=78), c is a sliding coefficient that controls the strength of basal motion from no sliding (c=0) to high sliding (high c) and lambda=1 is a given parameter. 
@@ -118,6 +120,8 @@ igm.config.iceflow_model_lib_path='../../model-lib/f14_pismbp_GJ_21_a'
 igm.config.opti_control=['thk','strflowctrl','usurf']
 igm.config.opti_cost=['velsurf','thk','usurf','divfluxfcz','icemask']   
 igm.config.opti_usurfobs_std             = 5.0   # Tol to fit top ice surface 
+igm.config.plot_result           = True
+igm.config.plot_live             = True
 
 igm.initialize()
 
@@ -132,7 +136,12 @@ igm.print_all_comp_info()
 
 # Monitoring the optimization
 
+You may monitor the data assimilation during the inverse modelling in several ways:
 
+* Check that the components of the costs decrease over time, the value of cost are printed during the optimization, and a graph is produced at the end.
+* Set up igm.config.plot_result = True and igm.config.plot_live = True to monitor in live time the evolution of the field your are optimizing such as the ice thickness, the surface ice speeds, ect ... You may also check (hopefully decreasing) STD given in the figure.
+* You may do the same monitoring after the run looking at optimize.nc
+* If you asked divfluxfcz to be in igm.config.opti_cost, you should check what look like the divergence of the fluc (divflux)
 
 # Reference
 
