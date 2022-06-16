@@ -20,17 +20,17 @@ All the data need to be assemblied in 2D raster grid in an netcdf file (called b
 
 # Asumption on the ice flow control
 
-Optimizing for both Arrhenius factor (A) and sliding coefficient (c) would lead to multiple solutions as several combinations of the two may explain the observed ice flow similarly. To deal with this issue, we introduce a single control of the ice flow strenght (named as strflowctrl in IGM) $\bar{A}$ = A + lambda c, where A is the Arrhenius factor that controls the ice shearing from cold-ice case (low A) to temperate ice case (A=78), c is a sliding coefficient that controls the strength of basal motion from no sliding (c=0) to high sliding (high c) and lambda=1 is a given parameter. 
+Optimizing for both Arrhenius factor (A) and sliding coefficient (c) would lead to multiple solutions as several combinations of the two may explain the observed ice flow similarly. To deal with this issue, we introduce a single control of the ice flow strenght (named as 'strflowctrl' in IGM) $\tilde{A}$ = A + lambda c, where A is the Arrhenius factor that controls the ice shearing from cold-ice case (low A) to temperate ice case (A=78), c is a sliding coefficient that controls the strength of basal motion from no sliding (c=0) to high sliding (high c) and lambda=1 is a given parameter. 
 
 ![](https://github.com/jouvetg/igm/blob/main/fig/strflowctrl.png)
 
 # General optimization setting
 
 The optimization problem consists of finding spatially varying fields ($h$, $\tilde{A}$, $s$) that minimize the cost function
-$$ \mathcal{J}(h,\tilde{A},s) = \mathcal{C}^u + \mathcal{C}^h + \mathcal{C}^s + \mathcal{C}^{d} + \mathcal{R}^h +  \mathcal{R}^{\tilde{A}}, $$
+$$ \mathcal{J}(h,\tilde{A},s) = \mathcal{C}^u + \mathcal{C}^h + \mathcal{C}^s + \mathcal{C}^{d} + \mathcal{R}^h +  \mathcal{R}^{\tilde{A}} +  \mathcal{P}^h, $$
 
 where $\mathcal{C}^u$ is the misfit between modeled and observed surface ice velocities ($\mathcal{F}$ is the output of the ice flow emulator/neural network):
-$$ \mathcal{C}^u = \int_{\Omega} \frac{1}{2 \sigma_u^2} \left| {\bf u}^{s,obs} - \mathcal{F}( h, \frac{\partial s}{\partial x}, \frac{\partial s}{\partial y}, \tilde{A})  \right|^2 + \mathcal{P}^h,  $$
+$$ \mathcal{C}^u = \int_{\Omega} \frac{1}{2 \sigma_u^2} \left| {\bf u}^{s,obs} - \mathcal{F}( h, \frac{\partial s}{\partial x}, \frac{\partial s}{\partial y}, \tilde{A})  \right|^2,  $$
 
 where $\mathcal{C}^h$ is the misfit between modeled and observed ice thickness profiles:
 $$ \mathcal{C}^h = \sum_{p=1,...,P} \sum_{i=1,...,M_p} \frac{1}{2 \sigma_h^2}  | h_p^{obs}  (x^p_i, y^p_i) - h (x^p_i, y^p_i) |^2, $$
@@ -38,14 +38,14 @@ $$ \mathcal{C}^h = \sum_{p=1,...,P} \sum_{i=1,...,M_p} \frac{1}{2 \sigma_h^2}  |
 where $\mathcal{C}^s$ is the misfit between the modeled and observed top ice surface:
 $$ \mathcal{C}^s = \int_{\Omega} \frac{1}{2 \sigma_s^2}  \left| s - s^{obs}  \right|^2,$$
 
-where $\mathcal{C}^{d}$ is a misfit term between the flux divergence $\nabla \cdot (h {\bar{\bf u}})$ and its polynomial 
+where $\mathcal{C}^{d}$ is a misfit term between the flux divergence and its polynomial 
 regression $d$ with respect to the ice surface elevation $s(x,y)$ to enforce smoothness with  dependence to $s$:
 $$ \mathcal{C}^{d} = \int_{\Omega} \frac{1}{2 \sigma_d^2} \left| \nabla \cdot (h {\bar{\bf u}}) - d  \right|^2, $$
 
 where $\mathcal{R}^h$ is a regularization term to enforce anisotropic smoothness and convexity of $h$:
-$$ \mathcal{R}^h = \alpha_h \int_{h>0} \left(  | \nabla h \cdot \tilde{{\bf u}}^{s,obs} |^2 + \beta  | \nabla h \cdot (\tilde{{\bf u}}^{s,obs})^{\perp} |^2   -  \gamma h  \right)  $$
+$$ \mathcal{R}^h = \alpha_h \int_{h>0} \left(  | \nabla h \cdot \tilde{{\bf u}}^{s,obs} |^2 + \beta  | \nabla h \cdot (\tilde{{\bf u}}^{s,obs})^{\perp} |^2   -  \gamma h  \right),  $$
 
-where the other term is a regularization term to enforce smooth $\tilde{A}$:
+where $\mathcal{R}^{A}$ is a regularization term to enforce smooth $\tilde{A}$:
 $$ \mathcal{R}^{\tilde{A}} = \alpha_{\tilde{A}} \int_{\Omega} | \nabla  \tilde{A}  |^2, $$
 
 where $\mathcal{P}^h$ is a penalty term to enforce nonnegative ice thickness, and zero thickness outside a given mask:
