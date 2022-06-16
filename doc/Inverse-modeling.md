@@ -18,11 +18,10 @@ Of course, you may not have all these data, which is fine. It is possible to kee
 
 All the data need to be assemblied in 2D raster grid in an netcdf observation.nc file using convention variable names but ending with 'obs'. E.g. observation.nc contains fields 'usurfobs' (observed top surface elevation), thkobs (observed thickness profiles, use nan or novalue where no data is available), icemaskobs (this mask from RGI outline serve to enforce zero ice thickness outside the mask), uvelsurfobs and vvelsurfobs (x- and y- components of the horizontal surface ice velocity, use nan or novalue where no data is available), thkinit (this is a formerly inferred ice thickness field that may be used to initalize the inverse model, otherwise it would start from thk=0).
 
-# Step 2: Set-up the inverse model (define the cost function to minize)
+# Step 2: Set-up the inverse model (cost function to minimize)
 
 The optimization problem consists of finding spatially varying fields $h$, $\tilde{A}$ and $s$ that minimize the cost function
-
-$$ \mathcal{J}(h,\tilde{A},s) & = \mathcal{C}^u + \mathcal{C}^h + \mathcal{C}^s + \mathcal{C}^{d} + \mathcal{R}^h +  \mathcal{R}^{\tilde{A}} $$
+$$ \mathcal{J}(h,\tilde{A},s) = \mathcal{C}^u + \mathcal{C}^h + \mathcal{C}^s + \mathcal{C}^{d} + \mathcal{R}^h +  \mathcal{R}^{\tilde{A}} $$
 where
 $$ \mathcal{C}^u = \int_{\Omega} \frac{1}{2 \sigma_u^2} \left| {\bf u}^{s,obs} - \mathcal{F}( h, \frac{\partial s}{\partial x}, \frac{\partial s}{\partial y}, \tilde{A})  \right|^2  $$
 is the misfit between modeled and observed surface ice velocities ($\mathcal{F}$ is the output of the ice flow emulator/neural network),
@@ -33,7 +32,7 @@ is the misfit between the modeled and observed top ice surface,
 $$ \mathcal{C}^{d} = \int_{\Omega} \frac{1}{2 \sigma_d^2} \left| \nabla \cdot (h {\bar{\bf u}}) - d^{poly}  \right|^2, $$
 is a misfit term between the flux divergence $\nabla \cdot (h {\bar{\bf u}})$ and its polynomial regression 
 $d^{poly}$ with respect to the ice surface elevation $s(x,y)$ to enforce smoothness with linear dependence to $s$, 
-$$ \mathcal{R}^h & = \alpha_h \int_{h>0} \left(  | \nabla h \cdot \tilde{{\bf u}}^{s,obs} |^2 
+$$ \mathcal{R}^h = \alpha_h \int_{h>0} \left(  | \nabla h \cdot \tilde{{\bf u}}^{s,obs} |^2 
 + \beta  | \nabla h \cdot (\tilde{{\bf u}}^{s,obs})^{\perp} |^2   -    \gamma h  \right)  $$
 is a regularization term to enforce anisotropic smoothness and convexity of $h$ (see next paragraph),
 $$ \mathcal{R}^{\tilde{A}} = \alpha_{\tilde{A}} \int_{\Omega} | \nabla  \tilde{A}  |^2  $$
