@@ -72,9 +72,9 @@ igm.config.opti_cost=['velsurf','icemask']  # In this case, you only fit surface
 
 # Exploring parameters
 
-There are quite a lot of parameters that may need to be tuned for each applications. 
+There are parameters that may need to tune for each application.
 
-First, you may change confidence levels $\sigma^u, \sigma^h, \sigma^s, \sigma^d$ to fit surface ice velocity, ice thickness, surface top elevation, or divergence of the flux as follows:
+First, you may change your expected confidence levels (i.e. tolerance to fit the data) $\sigma^u, \sigma^h, \sigma^s, \sigma^d$ to fit surface ice velocity, ice thickness, surface top elevation, or divergence of the flux as follows:
 
 ```python
 igm.config.opti_velsurfobs_std = 5 # unit m/y
@@ -83,7 +83,7 @@ igm.config.opti_usurfobs_std   = 5 # unit m
 igm.config.opti_divfluxobs_std = 1 # unit m/y
 ```
 
-Second, you may change regularization terms such as $\alpha^h, \alpha^A$, which control the weight of regularizations for the ice thickness and strflowctrl, or beta and gamma, which controls the smoothing anisotropy (we force further smoothness along the flow than across flow) and convexity as follows:
+Second, you may change regularization parameters such as i) $\alpha^h, \alpha^A$, which control the regularization weights for the ice thickness and strflowctrl (increasing $\alpha^h, \alpha^A$ will make thse fields spatially smoother), or ii) parameters beta and gamma involved for regularizing the ice thickness h. Taking beta=1 occurs to enforce isotropic smoothing, reducing beta will make the smoothing more and more anisotropic to enforce further smoothing along ice flow directions than accross directions (as expected for the topography of a glacier bedrock, which was eroded over long times). Setting parameter gamma to a small value may be usefull to add a bit of convexity in the system. This may help when initializing the inverse modelled with zero thickness, or to treat margin regions with no data available. These parameters may be changed as follows:
 
 ```python 
 igm.config.opti_regu_param_thk = 10.0            # weight for the regul. of thk
@@ -92,14 +92,13 @@ igm.config.opti_smooth_anisotropy_factor = 0.2
 igm.config.opti_convexity_weight = 0.002
 ```
 
-Hereabove, increasing $\alpha^h, \alpha^A$ will make h and A smoother. Taking beta=1 occurs to enforce isotropic smoothing, reducing beta will make the smoothing more and more anisotropic to enforce further smoothing along ice flow direction than accross directions (as expected for the topography of a glacier bedrock, which has been submitted to glacier erosion for long times). Lastly, setting parameter gamma to a small value brings a bit of convexity in the system, this may help when initializing the inverse modelled with zero thickness, or to treat rmargin egions with hardly no data available.
-
-Lastly, there are a couple of other parameters we may be interest to change
+Lastly, there are a couple of other parameters we may be interest to change e.g.
 
 ```python 
 igm.config.opti_nbitmax       = 1000   # Number of it. for the optimization
 igm.config.opti_step_size     = 0.001  # step size in the optimization iterative algorithm
 igm.config.opti_init_zero_thk = True   # Force inializing with zero ice thickness (otherwise take thkinit)
+igm.config.observation_file   = 'observation.nc'
 ```
 
 # Running the optimization
@@ -115,7 +114,7 @@ import igm
 igm = igm() 
  
 # change parameters
-igm.config.iceflow_model_lib_path='../../model-lib/f17_pismbp_GJ_22_a' 
+igm.config.iceflow_model_lib_path='../../model-lib/f14_pismbp_GJ_21_a' 
 igm.config.opti_control=['thk','strflowctrl','usurf']
 igm.config.opti_cost=['velsurf','thk','usurf','divfluxfcz','icemask']   
 igm.config.opti_usurfobs_std             = 5.0   # Tol to fit top ice surface 
@@ -130,6 +129,10 @@ with tf.device(igm.device_name):
     
 igm.print_all_comp_info()
 ```
+
+# Monitoring the optimization
+
+
 
 # Reference
 
