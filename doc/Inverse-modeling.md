@@ -90,7 +90,7 @@ igm.config.opti_smooth_anisotropy_factor = 0.2
 igm.config.opti_convexity_weight = 0.002
 ```
 
-Hereabove, increasing $\alpha^h, \alpha^A$ will make $h$ and $\tilde{A}$ smoother. Taking $\beta=1$ occurs to enforce isotropic smoothing, reducing $\beta$ will make the smoothing more and more anisotropic to enforce further smoothing along ice flow direction than accross directions (as expected for the topography of a glacier bedrock, which has been submitted to glacier erosion for long times). Lastly, setting parameter $\gamma$ to a small value brings a bit of convexity in the system, this may help when initializing the inverse modelled with zero thickness, or to treat rmargin egions with hardly no data available.
+Hereabove, increasing $\alpha^h, \alpha^A$ will make $h$ and $A$ smoother. Taking $\beta=1$ occurs to enforce isotropic smoothing, reducing $\beta$ will make the smoothing more and more anisotropic to enforce further smoothing along ice flow direction than accross directions (as expected for the topography of a glacier bedrock, which has been submitted to glacier erosion for long times). Lastly, setting parameter $\gamma$ to a small value brings a bit of convexity in the system, this may help when initializing the inverse modelled with zero thickness, or to treat rmargin egions with hardly no data available.
 
 Lastly, there are a couple of other parameters we may be interest to change
 
