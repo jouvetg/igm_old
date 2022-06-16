@@ -71,7 +71,7 @@ Make sure you have a balance between controls and constraints to ensure the prob
 # Exploring parameters
 
 There are quite a lot of parameters that may need to be tuned for each applications. First, you may change confidence levels
-$\sigma^u$, $\sigma^h$, $\sigma^s$, $\sigma^d$ to fit surface ice velocity, ice thickness, surface top elevation, or divergence of the flux. You may change these parameters as follows:
+$\sigma^u, \sigma^h, \sigma^s, \sigma^d$ to fit surface ice velocity, ice thickness, surface top elevation, or divergence of the flux. You may change these parameters as follows:
 
 ```python
 igm.config.opti_velsurfobs_std = 5 # unit m/y
@@ -80,7 +80,8 @@ igm.config.opti_usurfobs_std   = 5 # unit m
 igm.config.opti_divfluxobs_std = 1 # unit m/y
 ```
 
-Then you may change regularization terms such as $$\beta$$, which controls the smoothing anisotropy (we force further smoothness along the flow than across flow) or $$\gamma$$, which is a convexity parameter helping convergence.
+Then you may change regularization terms such as $\alpha^h, \alpha^A$, which control the weight of regularizations, and
+$\beta, \gamma$, which controls the smoothing anisotropy (we force further smoothness along the flow than across flow) or a convexity parameter helping convergence.
 
 ```python 
 --opti_regu_param_thk = 10.0            # weight for the regul. of thk
