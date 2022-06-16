@@ -56,8 +56,7 @@ igm.initialize()
 with tf.device(igm.device_name):
     igm.load_ncdf_data(igm.config.observation_file)
     igm.initialize_fields()
-    igm.initialize_iceflow()
     igm.optimize()
-    
+
 igm.print_all_comp_info()
 

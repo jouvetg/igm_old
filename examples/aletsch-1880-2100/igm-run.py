@@ -38,10 +38,9 @@ igm.config.working_dir           = ''
 igm.config.tstart                = 1880
 igm.config.tend                  = 2100
 igm.config.tsave                 = 1
-igm.config.init_strflowctrl      = 78
 igm.config.cfl                   = 0.25
 
-igm.config.iceflow_model_lib_path= '../../model-lib/f17_cfsflow_GJ_22_a'
+igm.config.iceflow_model_lib_path= '../../model-lib/f15_cfsflow_GJ_22_a'
 igm.config.type_climate          = 'aletsch'
 
 # option 1: traditional ams model (acc / melt) -- uncoment these lines
@@ -59,8 +58,8 @@ igm.config.weight_ablation       = 1.25
 igm.config.usegpu                = True
 
 igm.config.varplot_max           = 250
-igm.config.plot_result           = False
-igm.config.plot_live             = False
+igm.config.plot_result           = True
+igm.config.plot_live             = True
 
 # This permits to give sme weight to accumaulation bassins
 igm.config.weight_Aletschfirn    = 1.0
@@ -68,7 +67,7 @@ igm.config.weight_Jungfraufirn   = 1.0
 igm.config.weight_Ewigschneefeld = 1.0
 
 # This permits to compute particle trajectories
-igm.config.tracking_particles      = False  # activate particle tracking
+igm.config.tracking_particles      = True  # activate particle tracking
 igm.config.frequency_seeding       = 2    # we seed every 10 years
 igm.config.density_seeding         = 0.2   # we seed each 5 point of the 2D grid
 
@@ -86,15 +85,6 @@ with tf.device(igm.device_name):
     igm.thk.assign(igm.usurf-igm.topg)
     
     igm.initialize_fields()
-    igm.initialize_iceflow()
-    igm.update_climate()
-    igm.update_smb()
-    igm.update_iceflow()
-    if igm.config.tracking_particles:
-        igm.update_tracking_particles()
-    igm.update_ncdf_ex()
-    igm.update_ncdf_ts()
-    igm.print_info()
     
     while igm.t < igm.config.tend:
         
