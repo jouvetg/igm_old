@@ -20,7 +20,7 @@ All the data need to be assemblied in 2D raster grid in an netcdf observation.nc
 
 # Step 2: Set-up the inverse model (cost function to minimize)
 
-The optimization problem consists of finding spatially varying fields $h$, $\tilde{A}$ and $s$ that minimize the cost function
+The optimization problem consists of finding spatially varying fields $h$, $s$ that minimize the cost function
 $$ \mathcal{J}(h,\tilde{A},s) = \mathcal{C}^u + \mathcal{C}^h + \mathcal{C}^s + \mathcal{C}^{d} + \mathcal{R}^h +  \mathcal{R}^{\tilde{A}} $$
 where
 $$ \mathcal{C}^u = \int_{\Omega} \frac{1}{2 \sigma_u^2} \left| {\bf u}^{s,obs} - \mathcal{F}( h, \frac{\partial s}{\partial x}, \frac{\partial s}{\partial y}, \tilde{A})  \right|^2  $$
