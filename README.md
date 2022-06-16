@@ -14,18 +14,14 @@ The specificity of IGM is that it models the ice flow by a Convolutional Neural 
 ![Alt text](./fig/cores-figs.png)
 
 IGM consists of an open-source Python code, which runs across both CPU and GPU and deals with two-dimensional gridded input and output data. Together with a companion library of ice flow emulators, IGM permits user-friendly, highly efficient, and mechanically state-of-the-art glacier simulations.
-    
+  
 # Manual / Wiki
 
-IGM's documentation is in construction in the [wiki](https://github.com/jouvetg/igm/wiki)
-
+IGM's documentation can be found on the dedicated [wiki](https://github.com/jouvetg/igm/wiki)  
+  
 # Quick start
 
 The easiest and quickest way is to get to know IGM is to run notebooks in [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/jouvetg/igm/), which offers free access to GPU. 
-
-# IGM related Master and PhD project offers
-
-I'm currently seeking for students (at Master or PhD level) to develop IGM. If you are interested, just get in touch with me.
 
 # Contact
 
