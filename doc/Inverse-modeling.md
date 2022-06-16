@@ -37,9 +37,9 @@ regression $d$ with respect to the ice surface elevation $s(x,y)$ to enforce smo
 $$ \mathcal{C}^{d} = \int_{\Omega} \frac{1}{2 \sigma_d^2} \left| \nabla \cdot (h {\bar{\bf u}}) - d  \right|^2, $$
 
 where $\mathcal{R}^h$ is a regularization term to enforce anisotropic smoothness and convexity of $h$:
-$$ \mathcal{R}^h = \alpha_h \int_{h>0} \left(  | \nabla h \cdot \tilde{{\bf u}}^{s,obs} |^2 + \beta  | \nabla h \cdot (\tilde{{\bf u}}^{s,obs}) |^2   -    \gamma h  \right)  $$
+$$ \mathcal{R}^h = \alpha_h \int_{h>0} \left(  | \nabla h \cdot \tilde{{\bf u}}^{s,obs} |^2 + \beta  | \nabla h \cdot (\tilde{{\bf u}}^{s,obs})^{\perp} |^2   -  \gamma h  \right)  $$
 
-where $\mathcal{R}^{\tilde{A}}$ is a regularization term to enforce smooth $\tilde{A}$:
+where $\mathcal{R}^A$ is a regularization term to enforce smooth $\tilde{A}$:
 $$ \mathcal{R}^{\tilde{A}} = \alpha_{\tilde{A}} \int_{\Omega} | \nabla  \tilde{A}  |^2  $$
 
 
