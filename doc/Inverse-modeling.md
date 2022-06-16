@@ -1,7 +1,7 @@
 
 ### <h1 align="center" id="title">Inverse modelling (data assimilation) with IGM </h1>
 
-A data assimilation module of IGM permits to seek optimal ice thickness, top ice surface, and ice flow parametrization (red variables in the following figure), that best explains observational data such as surface ice speeds, ice thickness profiles, top ice surface (blue variables in the following figure) while being consistent with the ice flow emulator used in forwrd modelling. This page explains how to use the data assimilation module as a preliminary step in IGM of a forward/prognostic model run. I recomend to read the paper reference given below before to proceed further.
+A data assimilation module of IGM permits to seek optimal ice thickness, top ice surface, and ice flow parametrization (red variables in the following figure), that best explains observational data such as surface ice speeds, ice thickness profiles, top ice surface (blue variables in the following figure) while being consistent with the ice flow emulator used in forwrd modelling. This page explains how to use the data assimilation module as a preliminary step in IGM of a forward/prognostic model run. I recomend to read the paper reference given below before to proceed further. Look at the aletsch-invert example to try the inverse modelling on an example.
 
 ![](https://github.com/jouvetg/igm/blob/main/fig/scheme_simple_invert.png)
 
