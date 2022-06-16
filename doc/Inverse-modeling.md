@@ -30,7 +30,7 @@ The optimization problem consists of finding spatially varying fields ($h$, $\ti
 $$ \mathcal{J}(h,\tilde{A},s) = \mathcal{C}^u + \mathcal{C}^h + \mathcal{C}^s + \mathcal{C}^{d} + \mathcal{R}^h +  \mathcal{R}^{\tilde{A}}, $$
 
 where $\mathcal{C}^u$ is the misfit between modeled and observed surface ice velocities ($\mathcal{F}$ is the output of the ice flow emulator/neural network):
-$$ \mathcal{C}^u = \int_{\Omega} \frac{1}{2 \sigma_u^2} \left| {\bf u}^{s,obs} - \mathcal{F}( h, \frac{\partial s}{\partial x}, \frac{\partial s}{\partial y}, \tilde{A})  \right|^2,  $$
+$$ \mathcal{C}^u = \int_{\Omega} \frac{1}{2 \sigma_u^2} \left| {\bf u}^{s,obs} - \mathcal{F}( h, \frac{\partial s}{\partial x}, \frac{\partial s}{\partial y}, \tilde{A})  \right|^2 + \mathcal{P}^h,  $$
 
 where $\mathcal{C}^h$ is the misfit between modeled and observed ice thickness profiles:
 $$ \mathcal{C}^h = \sum_{p=1,...,P} \sum_{i=1,...,M_p} \frac{1}{2 \sigma_h^2}  | h_p^{obs}  (x^p_i, y^p_i) - h (x^p_i, y^p_i) |^2, $$
@@ -45,8 +45,11 @@ $$ \mathcal{C}^{d} = \int_{\Omega} \frac{1}{2 \sigma_d^2} \left| \nabla \cdot (h
 where $\mathcal{R}^h$ is a regularization term to enforce anisotropic smoothness and convexity of $h$:
 $$ \mathcal{R}^h = \alpha_h \int_{h>0} \left(  | \nabla h \cdot \tilde{{\bf u}}^{s,obs} |^2 + \beta  | \nabla h \cdot (\tilde{{\bf u}}^{s,obs})^{\perp} |^2   -  \gamma h  \right)  $$
 
-where the last term is a regularization term to enforce smooth $\tilde{A}$:
-$$ \mathcal{R}^{\tilde{A}} = \alpha_{\tilde{A}} \int_{\Omega} | \nabla  \tilde{A}  |^2. $$
+where the other term is a regularization term to enforce smooth $\tilde{A}$:
+$$ \mathcal{R}^{\tilde{A}} = \alpha_{\tilde{A}} \int_{\Omega} | \nabla  \tilde{A}  |^2, $$
+
+where $\mathcal{P}^h$ is a penalty term to enforce nonnegative ice thickness, and zero thickness outside a given mask:
+$$ \mathcal{P}^h  = 10^{10} \times \left( \int_{h<0} h^2 + \int_{\mathcal{M}^{\rm ice-free}} h^2 \right).$$
 
 The above optimization problem is the most general case, however, you may select only some components.
 For that, you need to define 
@@ -75,7 +78,7 @@ igm.config.opti_thkobs_std     = 5 # unit m
 igm.config.opti_usurfobs_std   = 5 # unit m
 igm.config.opti_divfluxobs_std = 1 # unit m/y
 ```
-Then you may change regularization terms such as $\alpha_h$ and $\alpha_{\tilde{A}}$, which control the weight of regularizations, $\beta$ controls the smoothing anisotropy (we force further smoothness along the flow than across flow) \item $\gamma$ is a convexity parameter helping convergence as follows
+Then you may change regularization terms such as $\alpha^h$ and $\alpha^{\tilde{A}}$, which control the weight of regularizations, $\beta$ controls the smoothing anisotropy (we force further smoothness along the flow than across flow) $\gamma$ is a convexity parameter helping convergence as follows
 
 ```python 
 --opti_regu_param_thk = 10.0            # weight for the regul. of thk
