@@ -20,7 +20,7 @@ All the data need to be assemblied in 2D raster grid in an netcdf file (called b
 
 # Asumption on the ice flow control
 
-Optimizing for both Arrhenius factor (A) and sliding coefficient (c) would lead to multiple solutions as several combinations of the two may explain the observed ice flow similarly. To deal with this issue, we introduce a single control of the ice flow strenght (named as strflowctrl in IGM) $\bar{A}$ = A + lambda c, where A is the Arrhenius factor that controls the ice shearing from cold-ice case (low A) to temperate ice case ($A=78$ MPa$^{-3}$ a$^{-1}$), c is a sliding coefficient that controls the strength of basal motion from no sliding (c=0) to high sliding (high $c$) and $\lambda=1$ km$^{-1}$ is a given parameter. 
+Optimizing for both Arrhenius factor (A) and sliding coefficient (c) would lead to multiple solutions as several combinations of the two may explain the observed ice flow similarly. To deal with this issue, we introduce a single control of the ice flow strenght (named as strflowctrl in IGM) $\bar{A}$ = A + lambda c, where A is the Arrhenius factor that controls the ice shearing from cold-ice case (low A) to temperate ice case (A=78), c is a sliding coefficient that controls the strength of basal motion from no sliding (c=0) to high sliding (high c) and lambda=1 is a given parameter. 
 
 ![](https://github.com/jouvetg/igm/blob/main/fig/strflowctrl.png)
 
