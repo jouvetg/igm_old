@@ -80,7 +80,7 @@ igm.config.opti_usurfobs_std   = 5 # unit m
 igm.config.opti_divfluxobs_std = 1 # unit m/y
 ```
 
-Then you may change regularization terms such as $\beta$ controls the smoothing anisotropy (we force further smoothness along the flow than across flow) $\gamma$ is a convexity parameter helping convergence as follows
+Then you may change regularization terms such as $\beta$, which controls the smoothing anisotropy (we force further smoothness along the flow than across flow) or $\gamma$, which is a convexity parameter helping convergence.
 
 ```python 
 --opti_regu_param_thk = 10.0            # weight for the regul. of thk
