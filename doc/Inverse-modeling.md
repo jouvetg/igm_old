@@ -5,7 +5,7 @@ A data assimilation module of IGM permits to seek optimal ice thickness, top ice
 
 ![](https://github.com/jouvetg/igm/blob/main/fig/scheme_simple_invert.png)
 
-# Step 1: Getting the data 
+# Getting the data 
 
 The first thing you need to do is to get as much data as possible, this includes:
 
@@ -18,7 +18,13 @@ Of course, you may not have all these data, which is fine. It is possible to kee
 
 All the data need to be assemblied in 2D raster grid in an netcdf observation.nc file using convention variable names but ending with 'obs'. E.g. observation.nc contains fields 'usurfobs' (observed top surface elevation), thkobs (observed thickness profiles, use nan or novalue where no data is available), icemaskobs (this mask from RGI outline serve to enforce zero ice thickness outside the mask), uvelsurfobs and vvelsurfobs (x- and y- components of the horizontal surface ice velocity, use nan or novalue where no data is available), thkinit (this is a formerly inferred ice thickness field that may be used to initalize the inverse model, otherwise it would start from thk=0).
 
-# Step 2: Set-up the inverse model (cost function to minimize)
+# Asumption on the ice flow control
+
+Optimizing for both Arrhenius factor ($A$) and sliding coefficient ($c$) would lead to multiple solutions as several combination of the two may explain the observed ice flow similarly. To deal with this issue, we introduce a single control of the ice flow strenght (named as strflowctrl in IGM) $\tilde{A} = A + \lambda c$, where $A$ is the Arrhenius factor that controls the ice shearing from cold-ice case (low $A$) to temperate ice case ($A=78$ MPa$^{-3}$ a$^{-1}$), $c$ is a sliding coefficient that controls the strength of basal motion from no sliding ($c=0$) to high sliding (high $c$) and $\lambda=1$ km$^{-1}$ is a given parameter. 
+
+![](https://github.com/jouvetg/igm/blob/main/fig/strflowctrl.png)
+
+# Set-up the inverse model (cost function to minimize)
 
 The optimization problem consists of finding spatially varying fields ($h$, $\tilde{A}$, $s$) that minimize the cost function
 $$ \mathcal{J}(h,\tilde{A},s) = \mathcal{C}^u + \mathcal{C}^h + \mathcal{C}^s + \mathcal{C}^{d} + \mathcal{R}^h +  \mathcal{R}^{\tilde{A}}, $$
@@ -41,6 +47,23 @@ $$ \mathcal{R}^h = \alpha_h \int_{h>0} \left(  | \nabla h \cdot \tilde{{\bf u}}^
 
 where the last term is a regularization term to enforce smooth $\tilde{A}$:
 $$ \mathcal{R}^{\tilde{A}} = \alpha_{\tilde{A}} \int_{\Omega} | \nabla  \tilde{A}  |^2. $$
+
+The above optimization problem is the most general case, however, you may select only some components.
+For that, you need to define 
+
+* the list of control variables you wish to optimize, e.g.
+```python
+igm.config.opti_control=['thk','strflowctrl','usurf'] # this is the most general case  
+igm.config.opti_control=['thk','usurf'] # this will only optimze ice thickness and top surface elevation
+igm.config.opti_control=['thk'] # this will only optimze ice thickness 
+```
+* the list of cost components you wish to minimize, e.g.
+```python
+igm.config.opti_cost=['velsurf','thk','usurf','divfluxfcz','icemask']  # this is the most general case  
+igm.config.opti_cost=['velsurf','icemask']  # In this case, you only fit surface velocity and ice mask.
+```
+Make sure you have a balance between controls and constraints to ensure the problem to have a unique solution.
+
 
 
 # Reference
