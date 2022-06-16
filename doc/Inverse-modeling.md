@@ -71,7 +71,7 @@ Make sure you have a balance between controls and constraints to ensure the prob
 # Exploring parameters
 
 There are quite a lot of parameters that may need to be tuned for each applications. First, you may change confidence levels
-$\sigma^u$, $\sigma^h$, $\sigma^s$, $\sigma^d$ to fit surface ice velocity, ice thickness, surface top elevation, or divergence of the flux. You may change these parameters as follows:
+$\sigma^u$,to fit surface ice velocity, ice thickness, surface top elevation, or divergence of the flux. You may change these parameters as follows:
 
 ```python
 igm.config.opti_velsurfobs_std = 5 # unit m/y
