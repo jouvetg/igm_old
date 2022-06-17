@@ -1,5 +1,5 @@
 [![License badge](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![CI badge](https://github.com/AdrienWehrle/earthspy/workflows/CI/badge.svg)][https://github.com/AdrienWehrle/igm/actions]
+[![CI badge](https://github.com/AdrienWehrle/earthspy/workflows/CI/badge.svg)](https://github.com/AdrienWehrle/igm/actions)
 ### <h1 align="center" id="title">The Instructed Glacier Model (IGM)</h1>
 
 # Notice 
