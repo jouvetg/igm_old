@@ -75,8 +75,20 @@ else:
 igm.config.type_mass_balance       = 'signal'
 igm.config.usegpu                  = True
 
-igm.initialize()
-
-igm.run()
+igm.initialize() 
+with tf.device(igm.device_name):
+    igm.load_ncdf_data(igm.config.geology_file)
+    igm.initialize_fields()               
+    while igm.t < igm.config.tend:                       
+        igm.update_smb()
+        igm.update_iceflow()
+        igm.update_t_dt() 
+        igm.update_thk()       
+        igm.update_ncdf_ex()
+        igm.update_ncdf_ts()
+        igm.update_plot()
+        igm.print_info()
+        
+igm.print_all_comp_info()
 
 igm.animate_result('ex.nc','thk',save=True)

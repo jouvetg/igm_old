@@ -13,21 +13,17 @@ Make sure the IGM's dependent libraries ar installed, or activate your igm envir
 
 		conda activate igm
 	 
-The following command permits to run the first example:
-
-		python -c "from igm import igm ; igm = igm() ; igm.run()" \
-		       --tstart 1000 \
-		       --tend 1250 \
-		       --tsave 2 \
-		       --cfl 0.3 \
-		       --init_strflowctrl 90 \
-		       --model_lib_path ../../model-lib/f12_cfsflow \
-		       --type_mass_balance simple \
-		       --usegpu True
-		       
-or equivalently
+In the second example, we run *igm-run-simple.py* (just look at it):
 
 		python igm-run-simple.py
+		
+You may change parameters directly in igm-run-simple.py or externally as follows:
+
+		python igm-run-simple.py --usegpu True --plot_result True
+		
+You may look at other parameters typing:
+
+		python igm-run-simple.py --help
 
 In the second example, we have defined our own mass balance routine in *igm-run-sinus.py* (just look at it), so it remains to run:
 
@@ -41,10 +37,3 @@ Don't forget to clean behind you:
 
 After any run, you may vizualize results with `ncview ex.nc`, or plot png snapshots on the fly activating the `--plot_result True` option.
 
-# Going further
-
-You may look at other parameters typing (or looking at igm.py):
-
-	python -c "from igm import igm ; igm = igm() " --help
-	
-e.g. activate the GPU with `--usegpu True`
