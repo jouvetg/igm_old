@@ -39,7 +39,7 @@ igm.config.usegpu            = True
 #igm.config.plot_live         = True
 #igm.config.plot_result       = True
 #igm.config.tsave             = 10
-#igm.config.varplot_max       = 250
+#igm.config.varplot_max       = 250 
 
 igm.initialize() 
 with tf.device(igm.device_name):

@@ -1185,7 +1185,7 @@ class igm:
         self.parser.add_argument(
             "--tracking_particles",
             type=int,
-            default=True,
+            default=False,
             help="Is the computational of the 3D vel active?",
         )
 

@@ -16,10 +16,10 @@ igm.config.type_mass_balance = 'simple'
 igm.config.usegpu            = True
 
 # Options is for a demo with live plot
-# igm.config.plot_live         = True
-# igm.config.plot_result       = True
-# igm.config.tsave             = 10
-# igm.config.varplot_max       = 250
+#igm.config.plot_live         = True
+#igm.config.plot_result       = True
+#igm.config.tsave             = 10
+#igm.config.varplot_max       = 250
 
 igm.initialize() 
 with tf.device(igm.device_name):

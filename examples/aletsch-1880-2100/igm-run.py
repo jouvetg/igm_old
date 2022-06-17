@@ -43,6 +43,9 @@ igm.config.cfl                   = 0.25
 igm.config.iceflow_model_lib_path= '../../model-lib/f15_cfsflow_GJ_22_a'
 igm.config.type_climate          = 'aletsch'
 
+igm.config.init_slidingco        = 0
+igm.config.init_arrhenius        = 78
+
 # option 1: traditional ams model (acc / melt) -- uncoment these lines
 igm.config.type_mass_balance     = 'accmelt'
 igm.config.massbalance_file      = 'massbalance.nc'
