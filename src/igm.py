@@ -2341,16 +2341,17 @@ class igm:
 
                 # Here one adds a regularization terms for the ice thickness to the cost function
                 if "thk" in self.config.opti_control:
-                    dbdx = thk[:, 1:] - thk[:, :-1]
-                    dbdx = (dbdx[1:, :] + dbdx[:-1, :]) / 2.0
-                    dbdy = thk[1:, :] - thk[:-1, :]
-                    dbdy = (dbdy[:, 1:] + dbdy[:, :-1]) / 2.0
-
                     if self.config.opti_smooth_anisotropy_factor == 1:
+                        dbdx = thk[:, 1:] - thk[:, :-1]
+                        dbdy = thk[1:, :] - thk[:-1, :]            
                         REGU_H = self.config.opti_regu_param_thk * (
                             tf.nn.l2_loss(dbdx) + tf.nn.l2_loss(dbdy)
                         )
                     else:
+                        dbdx = thk[:, 1:] - thk[:, :-1]
+                        dbdx = (dbdx[1:, :] + dbdx[:-1, :]) / 2.0
+                        dbdy = thk[1:, :] - thk[:-1, :]
+                        dbdy = (dbdy[:, 1:] + dbdy[:, :-1]) / 2.0
                         REGU_H = self.config.opti_regu_param_thk * (
                             tf.nn.l2_loss((dbdx * self.flowdirx + dbdy * self.flowdiry))
                             + self.config.opti_smooth_anisotropy_factor
