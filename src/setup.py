@@ -24,5 +24,5 @@ setup(
     ],
     extras_require={"gpu": ["tensorflow<=2.4.0", "tensorflow-gpu<=2.4.0"]},
     py_modules=["igm"],
-    scripts=["src/igm.py"],
+    scripts=["igm.py"],
 )

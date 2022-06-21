@@ -1052,7 +1052,6 @@ class igm:
             default=2.7 * 10 ** (-7),
             help="Herman, F. et al. Erosion by an Alpine glacier. Science 350, 193–195 (2015)",
         )
-
         self.parser.add_argument(
             "--erosion_exp",
             type=float,
@@ -1065,6 +1064,25 @@ class igm:
             default=100,
             help="Update the erosion only each 100 years",
         )
+        
+        self.parser.add_argument(
+            "--uplift_include",
+            type=str2bool,
+            default=False,
+            help="Include a model for constant bedrock uplift",
+        )
+        self.parser.add_argument(
+            "--uplift_rate",
+            type=float,
+            default=0.002,
+            help="unit is m/y",
+        )
+        self.parser.add_argument(
+            "--uplift_update_freq",
+            type=float,
+            default=100,
+            help="Update the uplift only each 100 years",
+        )
 
     def update_topg(self):
         """
@@ -1073,34 +1091,56 @@ class igm:
         of the sliding velocity magnitude
         """
 
+        if not hasattr(self, "already_called_update_topg"):
+            self.tlast_erosion = self.config.tstart
+            self.tlast_uplift  = self.config.tstart
+            self.tcomp["Erosion"] = []
+            self.tcomp["Uplift"] = []
+            self.already_called_update_topg = True
+            
         if self.config.erosion_include:
 
-            if not hasattr(self, "already_called_update_topg"):
-                self.tlast_erosion = self.config.tstart
-                self.tcomp["Erosion"] = []
-                self.already_called_update_topg = True
-
             if (self.t.numpy() - self.tlast_erosion) >= self.config.erosion_update_freq:
-
+    
                 if self.config.verbosity == 1:
                     print("Erode bedrock at time : ", self.t.numpy())
-
+    
                 self.tcomp["Erosion"].append(time.time())
-
+    
                 self.velbase_mag = self.getmag(self.uvelbase, self.vvelbase)
-
+    
                 self.dtopgdt.assign(self.config.erosion_cst * (self.velbase_mag ** self.config.erosion_exp))
-
+    
                 self.topg.assign(self.topg - (self.t.numpy() - self.tlast_erosion) * self.dtopgdt)
-
+    
                 print('max erosion is :', np.max( np.abs ( self.dtopgdt ) ) )
-
+    
                 self.usurf.assign(self.topg + self.thk)
-
+    
                 self.tlast_erosion = self.t.numpy()
-
+    
                 self.tcomp["Erosion"][-1] -= time.time()
                 self.tcomp["Erosion"][-1] *= -1
+                
+        if self.config.uplift_include:
+            
+            if (self.t.numpy() - self.tlast_uplift) >= self.config.uplift_update_freq:
+    
+                if self.config.verbosity == 1:
+                    print("Uplift bedrock at time : ", self.t.numpy())
+    
+                self.tcomp["Uplift"].append(time.time())
+                 
+                self.topg.assign(self.topg + self.config.uplift_rate * (self.t.numpy() - self.tlast_uplift) )
+    
+                self.usurf.assign(self.topg + self.thk)
+    
+                self.tlast_uplift = self.t.numpy()
+    
+                self.tcomp["Uplift"][-1] -= time.time()
+                self.tcomp["Uplift"][-1] *= -1
+            
+            
 
     ####################################################################################
     ####################################################################################
