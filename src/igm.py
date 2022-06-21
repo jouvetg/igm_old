@@ -38,13 +38,10 @@ from IPython.display import display, clear_output
 from numpy import dtype
 from scipy import stats
 
-
 def str2bool(v):
     return v.lower() in ("true", "1")
 
-
 ####################################################################################
-
 
 class igm:
 
@@ -63,7 +60,7 @@ class igm:
         self.parser = argparse.ArgumentParser(description="IGM")
         self.read_config_param()
         self.config = self.parser.parse_args()
-
+        
         config = tf.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
         session = tf.compat.v1.Session(config=config)
@@ -219,7 +216,7 @@ class igm:
         for var in nc.variables:
             if not var in ["x", "y"]:
                 vars()[var] = np.squeeze(nc.variables[var]).astype("float32")
-                vars()[var] = np.where(vars()[var] > 10**35, np.nan, vars()[var])
+                vars()[var] = np.where(vars()[var] > 10 ** 35, np.nan, vars()[var])
 
         if self.config.resample > 1:
             xx = x[:: self.config.resample]
@@ -301,9 +298,9 @@ class igm:
             self.slidingco = tf.Variable(
                 tf.ones_like(self.thk) * self.config.init_slidingco
             )
-
+            
         if self.config.erosion_include:
-            self.dtopgdt = tf.Variable(tf.zeros_like(self.thk))
+            self.dtopgdt = tf.Variable( tf.zeros_like(self.thk) )
 
         self.X, self.Y = tf.meshgrid(self.x, self.y)
 
@@ -339,7 +336,7 @@ class igm:
             "arrhenius + 10 * slidingco",
             "MPa$^{-3}$ a$^{-1}$",
         ]
-        self.var_info["dtopgdt"] = ["Erosion rate", "m/y"]
+        self.var_info["dtopgdt"] = ["Erosion rate","m/y"]
         self.var_info["arrhenius"] = ["Arrhenius factor", "MPa$^{-3}$ a$^{-1}$"]
         self.var_info["slidingco"] = ["Sliding Coefficient", "km MPa$^{-3}$ a$^{-1}$"]
         self.var_info["meantemp"] = ["Mean anual surface temperatures", "°C"]
@@ -384,7 +381,7 @@ class igm:
         mb_np = self.smb.numpy()
 
     def whatsize(self, n):
-        s = float(n.size * n.itemsize) / (10**6)
+        s = float(n.size * n.itemsize) / (10 ** 6)
         print("%1.0f Mbytes" % s)
 
     ####################################################################################
@@ -511,8 +508,8 @@ class igm:
 
         if force | self.saveresult:
 
-            vol = np.sum(self.thk) * (self.dx**2) / 10**9
-            area = np.sum(self.thk > 1) * (self.dx**2) / 10**6
+            vol = np.sum(self.thk) * (self.dx ** 2) / 10 ** 9
+            area = np.sum(self.thk > 1) * (self.dx ** 2) / 10 ** 6
 
             if self.it == 0:
 
@@ -589,24 +586,22 @@ class igm:
                 np.arange(self.config.tstart, self.config.tend, self.config.tsave)
             ) + [self.config.tend]
             self.itsave = 0
-
+            
         else:
             self.tcomp["Time step"].append(time.time())
-
+    
             velomax = max(
                 tf.math.reduce_max(tf.math.abs(self.ubar)),
                 tf.math.reduce_max(tf.math.abs(self.vbar)),
             ).numpy()
-
+    
             if velomax > 0:
-                self.dt_target = min(
-                    self.config.cfl * self.dx / velomax, self.config.dtmax
-                )
+                self.dt_target = min(self.config.cfl * self.dx / velomax, self.config.dtmax)
             else:
                 self.dt_target = self.config.dtmax
-
+    
             self.dt = self.dt_target
-
+    
             if self.tsave[self.itsave + 1] <= self.t.numpy() + self.dt:
                 self.dt = self.tsave[self.itsave + 1] - self.t.numpy()
                 self.t.assign(self.tsave[self.itsave + 1])
@@ -615,9 +610,9 @@ class igm:
             else:
                 self.t.assign(self.t.numpy() + self.dt)
                 self.saveresult = False
-
+    
             self.it += 1
-
+    
             self.tcomp["Time step"][-1] -= time.time()
             self.tcomp["Time step"][-1] *= -1
 
@@ -752,13 +747,13 @@ class igm:
             print("Update ICEFLOW at time : ", igm.t)
 
         if not hasattr(self, "already_called_update_iceflow"):
-
+  
             self.tcomp["Ice flow"] = []
             self.already_called_update_iceflow = True
             self.initialize_iceflow()
-
+            
         self.tcomp["Ice flow"].append(time.time())
-
+        
         X = tf.expand_dims(
             tf.stack(
                 [
@@ -1094,16 +1089,11 @@ class igm:
 
                 self.velbase_mag = self.getmag(self.uvelbase, self.vvelbase)
 
-                self.dtopgdt.assign(
-                    self.config.erosion_cst
-                    * (self.velbase_mag**self.config.erosion_exp)
-                )
+                self.dtopgdt.assign(self.config.erosion_cst * (self.velbase_mag ** self.config.erosion_exp))
 
-                self.topg.assign(
-                    self.topg - (self.t.numpy() - self.tlast_erosion) * self.dtopgdt
-                )
+                self.topg.assign(self.topg - (self.t.numpy() - self.tlast_erosion) * self.dtopgdt)
 
-                print("max erosion is :", np.max(np.abs(self.dtopgdt)))
+                print('max erosion is :', np.max( np.abs ( self.dtopgdt ) ) )
 
                 self.usurf.assign(self.topg + self.thk)
 
@@ -1129,29 +1119,27 @@ class igm:
         if not hasattr(self, "already_called_update_icethickness"):
             self.tcomp["Transport"] = []
             self.already_called_update_icethickness = True
-
+            
         else:
             if self.config.verbosity == 1:
                 print("Ice thickness equation at time : ", self.t.numpy())
-
+    
             self.tcomp["Transport"].append(time.time())
-
+    
             # compute the divergence of the flux
             self.divflux = self.compute_divflux(
                 self.ubar, self.vbar, self.thk, self.dx, self.dx
             )
-
+    
             # Forward Euler with projection to keep ice thickness non-negative
-            self.thk.assign(
-                tf.maximum(self.thk + self.dt * (self.smb - self.divflux), 0)
-            )
-
+            self.thk.assign(tf.maximum(self.thk + self.dt * (self.smb - self.divflux), 0))
+    
             self.usurf.assign(self.topg + self.thk)
-
+    
             self.slopsurfx, self.slopsurfy = self.compute_gradient_tf(
                 self.usurf, self.dx, self.dx
             )
-
+    
             self.tcomp["Transport"][-1] -= time.time()
             self.tcomp["Transport"][-1] *= -1
 
@@ -1183,7 +1171,7 @@ class igm:
 
         ## Computation of the divergence, final shape is (ny,nx)
         return (Qx[:, 1:] - Qx[:, :-1]) / dx + (Qy[1:, :] - Qy[:-1, :]) / dy
-
+    
     ####################################################################################
     ####################################################################################
     ####################################################################################
@@ -1193,7 +1181,7 @@ class igm:
     ####################################################################################
 
     def read_config_param_tracking(self):
-
+        
         self.parser.add_argument(
             "--tracking_particles",
             type=int,
@@ -1207,46 +1195,46 @@ class igm:
             default=10,
             help="Update frequency of tracking",
         )
-
+         
         self.parser.add_argument(
             "--density_seeding",
             type=int,
             default=0.2,
             help="density_seeding",
         )
-
+        
     def seeding_particles(self):
         """
         here we define (xpos,ypos) the horiz coordinate of tracked particles
         and rhpos is the relative position in the ice column (scaled bwt 0 and 1)
-
-        here we seed only the accum. area (a bit more), where there is
+                
+        here we seed only the accum. area (a bit more), where there is 
         significant ice, and in some points of a regular grid self.gridseed
         (density defined by density_seeding)
-
+        
         """
+        
+#        This will serve to remove imobile particles, but it is not active yet.
 
-        #        This will serve to remove imobile particles, but it is not active yet.
+#        indices = tf.expand_dims( tf.concat(
+#                       [tf.expand_dims((self.ypos - self.y[0]) / self.dx, axis=-1), 
+#                        tf.expand_dims((self.xpos - self.x[0]) / self.dx, axis=-1)], 
+#                       axis=-1 ), axis=0)
+         
+#        import tensorflow_addons as tfa
+   
+#        thk = tfa.image.interpolate_bilinear(
+#                    tf.expand_dims(tf.expand_dims(self.thk, axis=0), axis=-1),
+#                    indices,indexing="ij",      )[0, :, 0]
+                   
+#        J = (thk>1)
 
-        #        indices = tf.expand_dims( tf.concat(
-        #                       [tf.expand_dims((self.ypos - self.y[0]) / self.dx, axis=-1),
-        #                        tf.expand_dims((self.xpos - self.x[0]) / self.dx, axis=-1)],
-        #                       axis=-1 ), axis=0)
-
-        #        import tensorflow_addons as tfa
-
-        #        thk = tfa.image.interpolate_bilinear(
-        #                    tf.expand_dims(tf.expand_dims(self.thk, axis=0), axis=-1),
-        #                    indices,indexing="ij",      )[0, :, 0]
-
-        #        J = (thk>1)
-
-        I = (self.thk > 10) & (self.smb > -2) & self.gridseed
-        self.nxpos = self.X[I]
-        self.nypos = self.Y[I]
+        I = (self.thk>10)&(self.smb>-2)&self.gridseed
+        self.nxpos  = self.X[I]
+        self.nypos  = self.Y[I]
         self.nrhpos = tf.ones_like(self.X[I])
-        self.nwpos = tf.ones_like(self.X[I])
-
+        self.nwpos  = tf.ones_like(self.X[I])
+         
     def update_tracking_particles(self):
         """
         This function computes efficiently 3D particle trajectories
@@ -1255,187 +1243,134 @@ class igm:
 
         if self.config.verbosity == 1:
             print("Update TRACKING at time : ", igm.t)
-
+            
         if not hasattr(self, "already_called_update_tracking"):
             self.already_called_update_tracking = True
             self.tlast_seeding = -1.0e5000
             self.tcomp["Tracking"] = []
-
+            
             # initialize trajectories
-            self.xpos = tf.Variable([])
-            self.ypos = tf.Variable([])
-            self.rhpos = tf.Variable([])
-            self.wpos = tf.Variable([])
-
+            self.xpos   = tf.Variable([])
+            self.ypos   = tf.Variable([])
+            self.rhpos  = tf.Variable([])
+            self.wpos   = tf.Variable([])
+            
             # build the gridseed
-            self.gridseed = np.zeros_like(self.thk) == 1
-            rr = int(1.0 / self.config.density_seeding)
-            self.gridseed[::rr, ::rr] = True
-
-            directory = os.path.join(self.config.working_dir, "trajectories")
+            self.gridseed = (np.zeros_like(self.thk)==1)
+            rr = int(1.0/self.config.density_seeding)
+            self.gridseed[::rr,::rr] = True
+            
+            directory = os.path.join(self.config.working_dir, 'trajectories')
             if os.path.exists(directory):
                 shutil.rmtree(directory)
             os.mkdir(directory)
-
+            
             self.seedtimes = []
-
+            
         else:
-
+                   
             if (self.t.numpy() - self.tlast_seeding) >= self.config.frequency_seeding:
                 self.seeding_particles()
-
+                
                 # merge the new seeding points with the former ones
-                self.xpos = tf.Variable(tf.concat([self.xpos, self.nxpos], axis=-1))
-                self.ypos = tf.Variable(tf.concat([self.ypos, self.nypos], axis=-1))
-                self.rhpos = tf.Variable(tf.concat([self.rhpos, self.nrhpos], axis=-1))
-                self.wpos = tf.Variable(tf.concat([self.wpos, self.nwpos], axis=-1))
-
+                self.xpos  = tf.Variable(tf.concat([self.xpos,self.nxpos],axis=-1))
+                self.ypos  = tf.Variable(tf.concat([self.ypos,self.nypos],axis=-1))
+                self.rhpos = tf.Variable(tf.concat([self.rhpos,self.nrhpos],axis=-1))
+                self.wpos  = tf.Variable(tf.concat([self.wpos,self.nwpos],axis=-1))
+                
                 self.tlast_seeding = self.t.numpy()
-                self.seedtimes.append([self.t.numpy(), self.xpos.shape[0]])
-
+                self.seedtimes.append([self.t.numpy(),self.xpos.shape[0]])
+                 
             self.tcomp["Tracking"].append(time.time())
-
+            
             # find the indices of trajectories
             # these indicies are real values to permit 2D interpolations
             i = (self.xpos - self.x[0]) / self.dx
             j = (self.ypos - self.y[0]) / self.dx
-
-            indices = tf.expand_dims(
-                tf.concat(
-                    [tf.expand_dims(j, axis=-1), tf.expand_dims(i, axis=-1)], axis=-1
-                ),
-                axis=0,
-            )
-
+             
+            indices = tf.expand_dims( tf.concat(
+                           [tf.expand_dims(j, axis=-1), 
+                            tf.expand_dims(i, axis=-1)], 
+                           axis=-1 ), axis=0)
+             
             import tensorflow_addons as tfa
-
+     
             uvelbase = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.uvelbase, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
+                        tf.expand_dims(tf.expand_dims(self.uvelbase, axis=0), axis=-1),
+                        indices,indexing="ij",      )[0, :, 0]
+            
             vvelbase = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.vvelbase, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
+                        tf.expand_dims(tf.expand_dims(self.vvelbase, axis=0), axis=-1),
+                        indices,indexing="ij",      )[0, :, 0]
+            
             uvelsurf = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.uvelsurf, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
+                        tf.expand_dims(tf.expand_dims(self.uvelsurf, axis=0), axis=-1),
+                        indices,indexing="ij",      )[0, :, 0]
+            
             vvelsurf = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.vvelsurf, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
+                        tf.expand_dims(tf.expand_dims(self.vvelsurf, axis=0), axis=-1),
+                        indices,indexing="ij",      )[0, :, 0]
+            
             othk = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.thk, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
+                        tf.expand_dims(tf.expand_dims(self.thk, axis=0), axis=-1),
+                        indices,indexing="ij",      )[0, :, 0]
+            
             smb = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.smb, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
-            nthk = othk + smb * self.dt  # new ice thicnkess after smb update
-
+                        tf.expand_dims(tf.expand_dims(self.smb, axis=0), axis=-1),
+                        indices,indexing="ij",      )[0, :, 0]
+             
+            nthk = othk+smb*self.dt # new ice thicnkess after smb update
+    
             # adjust the relative height within the ice column with smb
-            self.rhpos.assign(
-                tf.where(
-                    nthk > 0.1, tf.clip_by_value(self.rhpos * othk / nthk, 0, 1), 1
-                )
-            )
-
-            uvel = uvelbase + (uvelsurf - uvelbase) * (
-                1 - (1 - self.rhpos) ** 4
-            )  # SIA-like
-            vvel = vvelbase + (vvelsurf - vvelbase) * (
-                1 - (1 - self.rhpos) ** 4
-            )  # SIA-like
-
-            self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
-            self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler
-
+            self.rhpos.assign(tf.where(nthk>0.1,
+                                       tf.clip_by_value(self.rhpos*othk/nthk,0,1),
+                                       1))
+            
+            uvel = uvelbase + (uvelsurf - uvelbase)*(1 - (1 - self.rhpos)**4) # SIA-like
+            vvel = vvelbase + (vvelsurf - vvelbase)*(1 - (1 - self.rhpos)**4) # SIA-like
+             
+            self.xpos.assign( self.xpos + self.dt*uvel ) # forward euler
+            self.ypos.assign( self.ypos + self.dt*vvel ) # forward euler
+    
             # THIS WAS IMPLMENTED BY MISTAKE BEFORE; WE NO LONGER USE THE VERTICAL VELOCITY
             # adjust the relative height within the ice column with the verticial velocity
             # self.rhpos.assign(tf.where(nthk>0.1,
             #                             tf.clip_by_value((self.rhpos*nthk+self.dt*wvel)/nthk,0,1),
             #                             1))
-
-            indices = tf.concat(
-                [
-                    tf.expand_dims(tf.cast(j, dtype="int32"), axis=-1),
-                    tf.expand_dims(tf.cast(i, dtype="int32"), axis=-1),
-                ],
-                axis=-1,
-            )
-            updates = tf.cast(tf.where(self.rhpos == 1, self.wpos, 0), dtype="float32")
-            self.weight_particles = tf.tensor_scatter_nd_add(
-                tf.zeros_like(self.thk), indices, updates
-            )
-
+            
+                                         
+            indices = tf.concat( [tf.expand_dims(tf.cast(j,dtype='int32'), axis=-1), 
+                                   tf.expand_dims(tf.cast(i,dtype='int32'), axis=-1)], axis=-1 )
+            updates = tf.cast(tf.where(self.rhpos==1,self.wpos,0),dtype='float32')
+            self.weight_particles = tf.tensor_scatter_nd_add( tf.zeros_like( self.thk ) , indices, updates)
+    
             self.tcomp["Tracking"][-1] -= time.time()
             self.tcomp["Tracking"][-1] *= -1
-
+        
     def update_write_trajectories(self):
-
+        
         if self.saveresult:
-
+        
             for i in range(len(self.seedtimes)):
-
+                
                 yearseed = self.seedtimes[i][0]
-                i0 = 0
-                if i > 0:
-                    i0 = self.seedtimes[i - 1][1]
-                i1 = self.seedtimes[i][1]
-
-                filename = "x-" + str(int(yearseed)) + ".dat"
-                with open(
-                    os.path.join(self.config.working_dir, "trajectories", filename), "a"
-                ) as f:
-                    print(
-                        *list(
-                            np.concatenate(
-                                [[self.t.numpy()], self.xpos[i0:i1].numpy()], axis=0
-                            )
-                        ),
-                        file=f
-                    )
-
-                filename = "y-" + str(int(yearseed)) + ".dat"
-                with open(
-                    os.path.join(self.config.working_dir, "trajectories", filename), "a"
-                ) as f:
-                    print(
-                        *list(
-                            np.concatenate(
-                                [[self.t.numpy()], self.ypos[i0:i1].numpy()], axis=0
-                            )
-                        ),
-                        file=f
-                    )
-
-                filename = "z-" + str(int(yearseed)) + ".dat"
-                with open(
-                    os.path.join(self.config.working_dir, "trajectories", filename), "a"
-                ) as f:
-                    print(
-                        *list(
-                            np.concatenate(
-                                [[self.t.numpy()], self.rhpos[i0:i1].numpy()], axis=0
-                            )
-                        ),
-                        file=f
-                    )
-
+                i0=0
+                if i>0:
+                    i0 = self.seedtimes[i-1][1]
+                i1     = self.seedtimes[i][1]
+            
+                filename="x-"+str(int(yearseed))+".dat"
+                with open(os.path.join(self.config.working_dir, 'trajectories', filename), 'a') as f:
+                    print( *list(np.concatenate([[self.t.numpy()],self.xpos[i0:i1].numpy()],axis=0)), file=f )
+                    
+                filename="y-"+str(int(yearseed))+".dat"
+                with open(os.path.join(self.config.working_dir, 'trajectories', filename), 'a') as f:
+                    print( *list(np.concatenate([[self.t.numpy()],self.ypos[i0:i1].numpy()],axis=0)), file=f )
+                    
+                filename="z-"+str(int(yearseed))+".dat"
+                with open(os.path.join(self.config.working_dir, 'trajectories', filename), 'a') as f:
+                    print( *list(np.concatenate([[self.t.numpy()],self.rhpos[i0:i1].numpy()],axis=0)), file=f )
+   
     ####################################################################################
     ####################################################################################
     ####################################################################################
@@ -1860,11 +1795,9 @@ class igm:
             help="Frequency of the output for the optimization",
         )
         self.parser.add_argument(
-            "--geology_optimized_file",
-            type=str,
-            default="geology-optimized.nc",
-            help="Geology input file",
+            "--geology_optimized_file", type=str, default="geology-optimized.nc", help="Geology input file"
         )
+
 
     def make_data_holes(self):
         """
@@ -2324,7 +2257,7 @@ class igm:
                                 self.usurf[ACT], divflux[ACT]
                             )  # this is a linear regression (usually that's enough)
                         # or you may go for polynomial fit (more gl, but may leads to errors)
-                        #  weights = np.polyfit(self.usurf[ACT],divflux[ACT], 2)
+                        #  weights = np.polyfit(self.usurf[ACT],divflux[ACT], 2) 
                         divfluxtar = tf.where(
                             ACT, res.intercept + res.slope * self.usurf, 0.0
                         )
@@ -2364,7 +2297,7 @@ class igm:
                 # force usurf = usurf - topg
                 if "topg" in self.config.opti_cost:
                     ACT = self.icemaskobs == 1
-                    COST_T = 10**10 * tf.reduce_mean(
+                    COST_T = 10 ** 10 * tf.reduce_mean(
                         (
                             usurf[ACT] * self.iceflow_fieldbounds["usurf"]
                             - thk[ACT] * self.iceflow_fieldbounds["thk"]
@@ -2377,16 +2310,16 @@ class igm:
 
                 # force zero thikness outisde the mask
                 if "icemask" in self.config.opti_cost:
-                    COST_O = 10**10 * tf.math.reduce_mean(
-                        tf.where(self.icemaskobs > 0.5, 0.0, thk**2)
+                    COST_O = 10 ** 10 * tf.math.reduce_mean(
+                        tf.where(self.icemaskobs > 0.5, 0.0, thk ** 2)
                     )
                 else:
                     COST_O = tf.Variable(0.0)
 
                 # Here one enforces non-negative ice thickness, and possibly zero-thickness in user-defined ice-free areas.
                 if "thk" in self.config.opti_control:
-                    COST_HPO = 10**10 * tf.math.reduce_mean(
-                        tf.where(thk >= 0, 0.0, thk**2)
+                    COST_HPO = 10 ** 10 * tf.math.reduce_mean(
+                        tf.where(thk >= 0, 0.0, thk ** 2)
                     )
                 else:
                     COST_HPO = tf.Variable(0.0)
@@ -2468,8 +2401,8 @@ class igm:
 
                 vol = (
                     np.sum(thk * self.iceflow_fieldbounds["thk"])
-                    * (self.dx**2)
-                    / 10**9
+                    * (self.dx ** 2)
+                    / 10 ** 9
                 )
 
                 if i % self.config.opti_output_freq == 0:
@@ -2595,7 +2528,7 @@ class igm:
 
         np.savetxt(
             os.path.join(self.config.working_dir, "volume.dat"),
-            np.array([np.sum(self.thk) * self.dx * self.dx / (10**9)]),
+            np.array([np.sum(self.thk) * self.dx * self.dx / (10 ** 9)]),
             fmt="%.3f",
         )
 
@@ -3207,6 +3140,8 @@ class igm:
 
             if self.config.varplot == "velbar_mag":
                 self.velbar_mag = self.getmag(self.ubar, self.vbar)
+                
+
 
             if firstime:
 
@@ -3221,16 +3156,11 @@ class igm:
                     vmax=self.config.varplot_max,
                 )
                 if self.config.tracking_particles:
-                    r = 1
-                    self.ip = self.ax.scatter(
-                        x=(self.xpos[::r] - self.x[0]) / self.dx,
-                        y=(self.ypos[::r] - self.y[0]) / self.dx,
-                        c=1 - self.rhpos[::r].numpy(),
-                        vmin=0,
-                        vmax=1,
-                        s=0.5,
-                        cmap="RdBu",
-                    )
+                    r=1
+                    self.ip = self.ax.scatter(x=(self.xpos[::r]-self.x[0])/self.dx, \
+                                              y=(self.ypos[::r]-self.y[0])/self.dx, \
+                                              c=1-self.rhpos[::r].numpy(), vmin=0, vmax=1, \
+                                              s=0.5, cmap="RdBu")
                 self.ax.set_title("YEAR : " + str(self.t.numpy()), size=15)
                 self.cbar = plt.colorbar(im)
 
@@ -3244,16 +3174,11 @@ class igm:
                 )
                 if self.config.tracking_particles:
                     self.ip.set_visible(False)
-                    r = 1
-                    self.ip = self.ax.scatter(
-                        x=(self.xpos[::r] - self.x[0]) / self.dx,
-                        y=(self.ypos[::r] - self.y[0]) / self.dx,
-                        c=1 - self.rhpos[::r].numpy(),
-                        vmin=0,
-                        vmax=1,
-                        s=0.5,
-                        cmap="RdBu",
-                    )
+                    r=1
+                    self.ip = self.ax.scatter(x=(self.xpos[::r]-self.x[0])/self.dx, \
+                                              y=(self.ypos[::r]-self.y[0])/self.dx, \
+                                              c=1-self.rhpos[::r].numpy(), vmin=0, vmax=1, \
+                                              s=0.5, cmap="RdBu")
                 self.ax.set_title("YEAR : " + str(self.t.numpy()), size=15)
 
             if self.config.plot_live:
@@ -3388,7 +3313,7 @@ class igm:
                     self.it,
                     self.t,
                     self.dt_target,
-                    np.sum(self.thk) * (self.dx**2) / 10**9,
+                    np.sum(self.thk) * (self.dx ** 2) / 10 ** 9,
                 )
             )
 
@@ -3456,16 +3381,16 @@ class igm:
             if len(self.config.restartingfile) > 0:
                 self.restart(-1)
 
-            #            self.initialize_iceflow()  # TO BE REMOVED
+#            self.initialize_iceflow()  # TO BE REMOVED
 
-            #            self.update_climate()      # TO BE REMOVED
-            #            self.update_smb()          # TO BE REMOVED
+#            self.update_climate()      # TO BE REMOVED
+#            self.update_smb()          # TO BE REMOVED
 
             if self.config.optimize:
                 self.optimize()
-
+                
             # TO BE REMOVED
-            # self.update_iceflow()
+            # self.update_iceflow()           
             # if self.config.tracking_particles:
             #     self.update_tracking_particles()
             # self.update_ncdf_ex()
@@ -3486,7 +3411,7 @@ class igm:
                 self.update_smb()
 
                 self.update_iceflow()
-
+                
                 if self.config.tracking_particles:
                     self.update_tracking_particles()
                     self.update_write_trajectories()
