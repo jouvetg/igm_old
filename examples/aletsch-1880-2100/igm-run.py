@@ -37,7 +37,7 @@ igm = igm()
 igm.config.working_dir           = ''
 igm.config.tstart                = 1880
 igm.config.tend                  = 2100
-igm.config.tsave                 = 1
+igm.config.tsave                 = 5
 igm.config.cfl                   = 0.25
 
 igm.config.iceflow_model_lib_path= '../../model-lib/f15_cfsflow_GJ_22_a'
@@ -71,7 +71,7 @@ igm.config.weight_Ewigschneefeld = 1.0
 
 # This permits to compute particle trajectories
 igm.config.tracking_particles      = False  # activate particle tracking
-igm.config.frequency_seeding       = 2    # we seed every 10 years
+igm.config.frequency_seeding       = 10    # we seed every 10 years
 igm.config.density_seeding         = 0.2   # we seed each 5 point of the 2D grid
 
 # From now, we could have call igm.run(), but we instead give all steps to embed some 
