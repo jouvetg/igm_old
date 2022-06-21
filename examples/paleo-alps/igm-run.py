@@ -2,11 +2,11 @@
 
 import tensorflow as tf
 import math
-from igm import igm
+from igm import Igm
 import numpy as np
 from scipy.interpolate import interp1d
  
-class igm(igm):
+class Igm(Igm):
 
     def init_smb_signal(self):
         """
@@ -41,54 +41,54 @@ class igm(igm):
         self.smb.assign( smb )
 
 # init IGM
-igm = igm()
+glacier = Igm()
 
 area = 'ticino' # chose your area among lyon, linth, rhine, ticino
 reso = 1000    # chose your resolution among 200,1000, 2000 meters (keep it coarse like 2000 for testing)
 
-igm.config.geology_file            = 'data-for-paleo-tuto/'+area+'-'+str(reso)+'.nc' 
-igm.config.tstart                  = -30000 
-igm.config.tend                    = -15000
-igm.config.tsave                   = 100  # save result each 100 years
-igm.config.cfl                     = 0.25 # if you see numerical unstabilities, decrease this.
-igm.config.init_strflowctrl        = 100  # this parameter controls the ice flow strengh, if you increase it, you accelerate the ice
+glacier.config.geology_file            = 'data-for-paleo-tuto/'+area+'-'+str(reso)+'.nc' 
+glacier.config.tstart                  = -30000 
+glacier.config.tend                    = -15000
+glacier.config.tsave                   = 100  # save result each 100 years
+glacier.config.cfl                     = 0.25 # if you see numerical unstabilities, decrease this.
+glacier.config.init_strflowctrl        = 100  # this parameter controls the ice flow strengh, if you increase it, you accelerate the ice
 
 # here you can change parameters that parametrize ELA 
-igm.config.pdela  = 3000 # Present-day ELA
+glacier.config.pdela  = 3000 # Present-day ELA
 if area=='rhine':
-  igm.config.deladt = 190 
+  glacier.config.deladt = 190 
 elif area=='linth':
-  igm.config.deladt = 220 
+  glacier.config.deladt = 220 
 else:
-  igm.config.deladt = 200
+  glacier.config.deladt = 200
 
 # here you can change parameters that parametrize the mass balance function (as defined above)
-igm.config.gradabl = 0.0067   # taken from (Cohen, 2018, TC)
-igm.config.gradacc = 0.0005   # taken from (Cohen, 2018, TC)
-igm.config.maxacc  = 1.0      # taken from (Cohen, 2018, TC)
+glacier.config.gradabl = 0.0067   # taken from (Cohen, 2018, TC)
+glacier.config.gradacc = 0.0005   # taken from (Cohen, 2018, TC)
+glacier.config.maxacc  = 1.0      # taken from (Cohen, 2018, TC)
 
 if reso<=200:
-  igm.config.iceflow_model_lib_path  = '../../model-lib/f12_cfsflow_GJ_21_a' # use this for resolution 100,200
+  glacier.config.iceflow_model_lib_path  = '../../model-lib/f12_cfsflow_GJ_21_a' # use this for resolution 100,200
 else:
-  igm.config.iceflow_model_lib_path  = '../../model-lib/f14_pism_GJ_21_a'    # use this for resolution 1000,2000
+  glacier.config.iceflow_model_lib_path  = '../../model-lib/f14_pism_GJ_21_a'    # use this for resolution 1000,2000
 
-igm.config.type_mass_balance       = 'signal'
-igm.config.usegpu                  = True
+glacier.config.type_mass_balance       = 'signal'
+glacier.config.usegpu                  = True
 
-igm.initialize() 
-with tf.device(igm.device_name):
-    igm.load_ncdf_data(igm.config.geology_file)
-    igm.initialize_fields()               
-    while igm.t < igm.config.tend:                       
-        igm.update_smb()
-        igm.update_iceflow()
-        igm.update_t_dt() 
-        igm.update_thk()       
-        igm.update_ncdf_ex()
-        igm.update_ncdf_ts()
-        igm.update_plot()
-        igm.print_info()
+glacier.initialize() 
+with tf.device(glacier.device_name):
+    glacier.load_ncdf_data(glacier.config.geology_file)
+    glacier.initialize_fields()               
+    while glacier.t < glacier.config.tend:                       
+        glacier.update_smb()
+        glacier.update_iceflow()
+        glacier.update_t_dt() 
+        glacier.update_thk()       
+        glacier.update_ncdf_ex()
+        glacier.update_ncdf_ts()
+        glacier.update_plot()
+        glacier.print_info()
         
-igm.print_all_comp_info()
+glacier.print_all_comp_info()
 
-igm.animate_result('ex.nc','thk',save=True)
+glacier.animate_result('ex.nc','thk',save=True)

@@ -43,7 +43,7 @@ def str2bool(v):
 
 ####################################################################################
 
-class igm:
+class Igm:
 
     ####################################################################################
     ####################################################################################
@@ -744,7 +744,7 @@ class igm:
         """
 
         if self.config.verbosity == 1:
-            print("Update ICEFLOW at time : ", igm.t)
+            print("Update ICEFLOW at time : ", self.t)
 
         if not hasattr(self, "already_called_update_iceflow"):
   
@@ -842,7 +842,7 @@ class igm:
             if force | new_clim_needed:
 
                 if self.config.verbosity == 1:
-                    print("Construct climate at time : ", igm.t)
+                    print("Construct climate at time : ", self.t)
 
                 self.tcomp["Climate"].append(time.time())
 
@@ -1282,7 +1282,7 @@ class igm:
         """
 
         if self.config.verbosity == 1:
-            print("Update TRACKING at time : ", igm.t)
+            print("Update TRACKING at time : ", self.t)
             
         if not hasattr(self, "already_called_update_tracking"):
             self.already_called_update_tracking = True
@@ -2196,7 +2196,7 @@ class igm:
                 # get the dimensions of the working array
                 Ny, Nx = self.thk.shape
 
-                # save output variables into igm.variables for outputs
+                # save output variables into self.variables for outputs
                 for kk, f in enumerate(self.iceflow_mapping["fieldout"]):
                     vars(self)[f].assign(
                         Y[0, :Ny, :Nx, kk] * self.iceflow_fieldbounds[f]
@@ -2492,7 +2492,7 @@ class igm:
                     zip([grads[i] for i in range(grads.shape[0])], var_to_opti)
                 )
 
-                # get back optimized variables in the pool of igm.variables
+                # get back optimized variables in the pool of self.variables
                 if "thk" in self.config.opti_control:
                     self.thk.assign(thk * self.iceflow_fieldbounds["thk"])
                     self.thk.assign(tf.where(self.thk < 0.01, 0, self.thk))

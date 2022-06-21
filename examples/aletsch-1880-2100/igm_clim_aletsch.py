@@ -10,10 +10,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 import math
-from igm import igm
+from igm import Igm
 import time
 
-class igm_clim_aletsch:
+class Igm_clim_aletsch:
 
     def read_config_param_climate_aletsch(self):
 

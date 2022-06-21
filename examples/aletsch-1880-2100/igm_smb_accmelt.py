@@ -18,7 +18,7 @@ import argparse
 from netCDF4 import Dataset
 from scipy.interpolate import interp1d
 
-class igm_smb_accmelt:
+class Igm_smb_accmelt:
 
     def read_config_param_accmelt(self):
 

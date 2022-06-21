@@ -18,6 +18,7 @@ setup(
         "tensorflow-addons",
         "scipy",
         "matplotlib",
+        "xarray",
         "netCDF4",
         "IPython",
         "keras",

@@ -61,14 +61,14 @@ The above optimization problem is given in the most general case, however, you m
 
 * the list of control variables you wish to optimize, e.g.
 ```python
-igm.config.opti_control=['thk','strflowctrl','usurf'] # this is the most general case  
-igm.config.opti_control=['thk','usurf'] # this will only optimize ice thickness and top surface elevation
-igm.config.opti_control=['thk'] # this will only optimize ice thickness 
+glacier.config.opti_control=['thk','strflowctrl','usurf'] # this is the most general case  
+glacier.config.opti_control=['thk','usurf'] # this will only optimize ice thickness and top surface elevation
+glacier.config.opti_control=['thk'] # this will only optimize ice thickness 
 ```
 * the list of cost components you wish to minimize, e.g.
 ```python
-igm.config.opti_cost=['velsurf','thk','usurf','divfluxfcz','icemask']  # this is the most general case  
-igm.config.opti_cost=['velsurf','icemask']  # In this case, you only fit surface velocity and ice mask.
+glacier.config.opti_cost=['velsurf','thk','usurf','divfluxfcz','icemask']  # this is the most general case  
+glacier.config.opti_cost=['velsurf','icemask']  # In this case, you only fit surface velocity and ice mask.
 ```
 *Make sure you have a balance between controls and constraints to ensure the problem to have a unique solution.*
 
@@ -79,28 +79,28 @@ There are parameters that may need to tune for each application.
 First, you may change your expected confidence levels (i.e. tolerance to fit the data) $\sigma^u, \sigma^h, \sigma^s, \sigma^d$ to fit surface ice velocity, ice thickness, surface top elevation, or divergence of the flux as follows:
 
 ```python
-igm.config.opti_velsurfobs_std = 5 # unit m/y
-igm.config.opti_thkobs_std     = 5 # unit m
-igm.config.opti_usurfobs_std   = 5 # unit m
-igm.config.opti_divfluxobs_std = 1 # unit m/y
+glacier.config.opti_velsurfobs_std = 5 # unit m/y
+glacier.config.opti_thkobs_std     = 5 # unit m
+glacier.config.opti_usurfobs_std   = 5 # unit m
+glacier.config.opti_divfluxobs_std = 1 # unit m/y
 ```
 
 Second, you may change regularization parameters such as i) $\alpha^h, \alpha^A$, which control the regularization weights for the ice thickness and strflowctrl (increasing $\alpha^h, \alpha^A$ will make thse fields spatially smoother), or ii) parameters beta and gamma involved for regularizing the ice thickness h. Taking beta=1 occurs to enforce isotropic smoothing, reducing beta will make the smoothing more and more anisotropic to enforce further smoothing along ice flow directions than accross directions (as expected for the topography of a glacier bedrock, which was eroded over long times). Setting parameter gamma to a small value may be usefull to add a bit of convexity in the system. This may help when initializing the inverse modelled with zero thickness, or to treat margin regions with no data available. These parameters may be changed as follows:
 
 ```python 
-igm.config.opti_regu_param_thk = 10.0            # weight for the regul. of thk
-igm.config.opti_regu_param_strflowctrl = 1.0     # weight for the regul. of strflowctrl
-igm.config.opti_smooth_anisotropy_factor = 0.2
-igm.config.opti_convexity_weight = 0.002
+glacier.config.opti_regu_param_thk = 10.0            # weight for the regul. of thk
+glacier.config.opti_regu_param_strflowctrl = 1.0     # weight for the regul. of strflowctrl
+glacier.config.opti_smooth_anisotropy_factor = 0.2
+glacier.config.opti_convexity_weight = 0.002
 ```
 
 Lastly, there are a couple of other parameters we may be interest to change e.g.
 
 ```python 
-igm.config.opti_nbitmax       = 1000   # Number of it. for the optimization
-igm.config.opti_step_size     = 0.001  # step size in the optimization iterative algorithm
-igm.config.opti_init_zero_thk = True   # Force inializing with zero ice thickness (otherwise take thkinit)
-igm.config.observation_file   = 'observation.nc'
+glacier.config.opti_nbitmax       = 1000   # Number of it. for the optimization
+glacier.config.opti_step_size     = 0.001  # step size in the optimization iterative algorithm
+glacier.config.opti_init_zero_thk = True   # Force inializing with zero ice thickness (otherwise take thkinit)
+glacier.config.observation_file   = 'observation.nc'
 ```
 
 # Running the optimization
@@ -111,26 +111,26 @@ The optimization scheme is implemented in igm function optimize(), calling it fo
 import numpy as np
 import tensorflow as tf
 
-import igm
+from igm import Igm
 
-igm = igm() 
+glacier = Igm() 
  
 # change parameters
-igm.config.iceflow_model_lib_path='../../model-lib/f14_pismbp_GJ_21_a' 
-igm.config.opti_control=['thk','strflowctrl','usurf']
-igm.config.opti_cost=['velsurf','thk','usurf','divfluxfcz','icemask']   
-igm.config.opti_usurfobs_std             = 5.0   # Tol to fit top ice surface 
-igm.config.plot_result           = True
-igm.config.plot_live             = True
+glacier.config.iceflow_model_lib_path='../../model-lib/f14_pismbp_GJ_21_a' 
+glacier.config.opti_control=['thk','strflowctrl','usurf']
+glacier.config.opti_cost=['velsurf','thk','usurf','divfluxfcz','icemask']   
+glacier.config.opti_usurfobs_std             = 5.0   # Tol to fit top ice surface 
+glacier.config.plot_result           = True
+glacier.config.plot_live             = True
 
-igm.initialize()
+glacier.initialize()
 
-with tf.device(igm.device_name):
-    igm.load_ncdf_data(igm.config.observation_file)
-    igm.initialize_fields()
-    igm.optimize()
+with tf.device(glacier.device_name):
+    glacier.load_ncdf_data(glacier.config.observation_file)
+    glacier.initialize_fields()
+    glacier.optimize()
     
-igm.print_all_comp_info()
+glacier.print_all_comp_info()
 ```
 
 # Monitoring the optimization
@@ -138,9 +138,9 @@ igm.print_all_comp_info()
 You may monitor the data assimilation during the inverse modelling in several ways:
 
 * Check that the components of the costs decrease over time, the value of cost are printed during the optimization, and a graph is produced at the end.
-* Set up igm.config.plot_result = True and igm.config.plot_live = True to monitor in live time the evolution of the field your are optimizing such as the ice thickness, the surface ice speeds, ect ... You may also check (hopefully decreasing) STD given in the figure.
+* Set up glacier.config.plot_result = True and glacier.config.plot_live = True to monitor in live time the evolution of the field your are optimizing such as the ice thickness, the surface ice speeds, ect ... You may also check (hopefully decreasing) STD given in the figure.
 * You may do the same monitoring after the run looking at optimize.nc
-* If you asked divfluxfcz to be in igm.config.opti_cost, you should check what look like the divergence of the fluc (divflux)
+* If you asked divfluxfcz to be in glacier.config.opti_cost, you should check what look like the divergence of the fluc (divflux)
 
 # Reference
 

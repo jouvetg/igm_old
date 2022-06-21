@@ -2,9 +2,9 @@
 
 import tensorflow as tf
 import math
-from igm import igm 
+from igm import Igm 
 
-class igm(igm):
+class Igm(Igm):
 
     def update_smb_sinus(self):
         """
@@ -23,36 +23,36 @@ class igm(igm):
 
         self.smb.assign( smb )
 
-igm = igm()
+glacier = Igm()
 
-igm.config.tstart            = 0
-igm.config.tend              = 500
-igm.config.tsave             = 2
-igm.config.cfl               = 0.3
-igm.config.init_slidingco    = 12
-igm.config.init_arrhenius    = 78
-igm.config.iceflow_model_lib_path    = '../../model-lib/f15_cfsflow_GJ_22_a'
-igm.config.type_mass_balance = 'sinus'
-igm.config.usegpu            = True
+glacier.config.tstart            = 0
+glacier.config.tend              = 500
+glacier.config.tsave             = 2
+glacier.config.cfl               = 0.3
+glacier.config.init_slidingco    = 12
+glacier.config.init_arrhenius    = 78
+glacier.config.iceflow_model_lib_path    = '../../model-lib/f15_cfsflow_GJ_22_a'
+glacier.config.type_mass_balance = 'sinus'
+glacier.config.usegpu            = True
 
 # Options is for a demo with live plot
-#igm.config.plot_live         = True
-#igm.config.plot_result       = True
-#igm.config.tsave             = 10
-#igm.config.varplot_max       = 250 
+#glacier.config.plot_live         = True
+#glacier.config.plot_result       = True
+#glacier.config.tsave             = 10
+#glacier.config.varplot_max       = 250 
 
-igm.initialize() 
-with tf.device(igm.device_name):
-    igm.load_ncdf_data(igm.config.geology_file)
-    igm.initialize_fields()               
-    while igm.t < igm.config.tend:                       
-        igm.update_smb()
-        igm.update_iceflow()
-        igm.update_t_dt() 
-        igm.update_thk()       
-        igm.update_ncdf_ex()
-        igm.update_ncdf_ts()
-        igm.update_plot()
-        igm.print_info()
+glacier.initialize() 
+with tf.device(glacier.device_name):
+    glacier.load_ncdf_data(glacier.config.geology_file)
+    glacier.initialize_fields()               
+    while glacier.t < glacier.config.tend:                       
+        glacier.update_smb()
+        glacier.update_iceflow()
+        glacier.update_t_dt() 
+        glacier.update_thk()       
+        glacier.update_ncdf_ex()
+        glacier.update_ncdf_ts()
+        glacier.update_plot()
+        glacier.print_info()
         
-igm.print_all_comp_info()
+glacier.print_all_comp_info()
