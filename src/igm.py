@@ -557,7 +557,7 @@ class Igm:
 
     def update_t_dt(self):
         """
-        compute time step to satisfy the CLF condition and hit requested saving times
+        For stability reasons of the transport scheme for the ice thickness evolution, the time step must respect a CFL condition, controlled by parameter glacier.config.cfl, which is the maximum number of cells crossed in one iteration (this parameter cannot exceed one). Function glacier.update_t_dt() return time step dt, updated time t, and a boolean telling whether results must be saved or not.
         """
         if self.config.verbosity == 1:
             print("Update DT from the CFL condition at time : ", self.t.numpy())
@@ -726,7 +726,31 @@ class Igm:
 
     def update_iceflow(self):
         """
-        function update the ice flow using the neural network emulator
+        Ice flow dynamics are modeled using Artificial Neural Networks trained from physical models.
+        
+        You may find trained and ready-to-use ice flow emulators in the folder model-lib/T_M_I_Y_V/R/ 
+        where T_M_I_Y_V defines the emulator, and R defines the spatial resolution. 
+        Make sure that the resolution of the picked emulator is available in the database. 
+        Results produced with IGM will strongly rely on the chosen emulator. Make sure that you use 
+        the emulator within the hull of its training dataset (e.g., do not model an ice sheet 
+        with an emulator trained with mountain glaciers) to ensure reliability 
+        (or fidelity w.r.t to the instructor model) -- the emulator is probably much better at 
+        interpolating than at extrapolating. Information on the training dataset is provided in 
+        a dedicated README coming along with the emulator.
+        
+        At the time of writing, I recommend using f15_cfsflow_GJ_22_a, which takes ice thickness, 
+        top surface slopes, the sliding coefficient c ('slidingco'), and Arrhenuis factor A ('arrhenius'), 
+        and return basal, vertical-average and surface x- and y- velocity components as depicted on the following graph: 
+        
+        ![](https://github.com/jouvetg/igm/blob/main/fig/mapping-f15.png)
+        
+        I have trained f17_cfsflow_GJ_22_a using a large dataset of modeled glaciers 
+        (based on a Stokes-based CfsFlow ice flow solver) and varying sliding coefficient c, 
+        and Arrhenius factor A into a 2D space. 
+        
+        For now, only the emulator trained by CfsFlow and PISM is available with different resolutions. 
+        Consider training your own with the [Deep Learning Emulator](https://github.com/jouvetg/dle) 
+        if none of these emulators fill your need.
         """
 
         if self.config.verbosity == 1:
@@ -806,7 +830,9 @@ class Igm:
 
     def update_climate(self, force=False):
         """
-        compute climate at time t
+        Climate forcing can be easily enforced in IGM by customizing this function to your needs, 
+        e.g., building fields of temperature and precipitation, which can be used by an accumulation/melt model 
+        (PDD-like) model. Check at the aletsch-1880-21000 example.
         """
 
         if len(self.config.type_climate) > 0:
@@ -976,7 +1002,26 @@ class Igm:
 
     def update_smb(self, force=False):
         """
-        update_mass balance
+        IGM can use several surface mass balance model:
+        
+        * IGM comes with a very simple mass balance model based on a few parameters (ELA, ...). 
+        
+        * Users can build their own mass balance routines relatively easily, 
+        and possibly combine them with a climate routine (see Climate model below). 
+        E.g. in the aletsch-1880-21000 example, both climate and surface mass balance models were 
+        customized to implement i) the computation of daily temperature and precipitation 2D fields 
+        ii) an accumulation/melt model (PDD-like) that takes the climate input, and transforms them into 
+        effective surface mass balance.
+        
+        * The structure of IGM facilitates the embedding of further emulators beyond the ice flow model 
+        assuming that it maps 2D gridded fields to 2D gridded fields similar to the ice flow one. 
+        This applies to predicting surface mass balance from temperature and precipitation fields. 
+        IGM permits embedding a neural network emulator to model mass balance. As an illustration, 
+        I have trained a Convolutional Neural Network (CNN) from climate and mass balance data from 
+        glaciers in the Alps using the [Deep Learning Emulator](https://github.com/jouvetg/dle). 
+        To try it, check the example aletsch-1880-2100. Note that this is highly experimental 
+        considering that so far i) the training dataset is small ii) CNN is overkilled here 
+        iii) no assessment was done.
         """
 
         if not hasattr(self, "already_called_update_smb"):
@@ -1066,9 +1111,15 @@ class Igm:
 
     def update_topg(self):
         """
-        update bedrock due to glacial errosion,
-        eroson rate are proportional to a power
-        of the sliding velocity magnitude
+        IGM permits glacier evolution modeling over time scales of million years. 
+        Over such a time scale glacial erosion or uplift may change the basal topography substantially. 
+        Setting glacier.config.erosion_include=True, the bedrock is updated 
+        (each glacier.config.erosion_update_freq years) assuming the erosion rate to be proportional 
+        (parameter glacier.config.erosion_cst) to a power (parameter glacier.config.erosion_exp) 
+        of the sliding velocity magnitude. By default, we use the parameters from Herman, F. et al. 
+        Erosion by an Alpine glacier. Science 350, 193–195 (2015). Check at the function 
+        glacier.update_topg() for more details on the implementation of glacial erosion in IGM. 
+        Setting glacier.config.uplift_include=True will allow to include an uplift defined by glacier.config.uplift_rate.
         """
 
         if not hasattr(self, "already_called_update_topg"):
@@ -1138,8 +1189,17 @@ class Igm:
 
     def update_thk(self):
         """
-        update ice thickness solving dh/dt + d(u h)/dx + d(v h)/dy = f using
-        upwind finite volume, update usurf and slopes
+        The mass conservation equation is solved using an explicit first-order upwind 
+        finite-volume scheme on a regular 2D grid with constant cell spacing in any direction. 
+        The discretization and the approximation of the flux divergence is described 
+        [here](https://github.com/jouvetg/igm/blob/main/fig/transp-igm.jpg). 
+        With this scheme mass of ice is allowed to move from cell to cell (where thickness 
+        and velocities are defined) from edge-defined fluxes (inferred from depth-averaged 
+        velocities, and ice thickness in upwind direction). 
+        The resulting scheme is mass conservative and parallelizable (because fully explicit). 
+        However, it is subject to a CFL condition. This means that the time step 
+        (defined in glacier.update_t_dt()) is controlled by parameter glacier.config.cfl,
+        which is the maximum number of cells crossed in one iteration (this parameter cannot exceed one).
         """
 
         if not hasattr(self, "already_called_update_icethickness"):
@@ -1262,8 +1322,41 @@ class Igm:
 
     def update_tracking_particles(self):
         """
-        This function computes efficiently 3D particle trajectories
-        within the ice
+        IGM includes a particle tracking routine, which can compute a large number of trajectories 
+        (as it is implemented with TensorFlow to run in parallel) in live time during the forward model run. 
+        The routine produces some seeding of particles (by default in the accumulation area at regular 
+        intervals), and computes the time trajectory of the resulting particle in time advected by 
+        the velocity field in 3D. Horizontal and vertical directions are treated differently:
+        
+        * In the horizontal plan, particles are advected with the horizontal velocity field 
+        (interpolated bi-linearly). The positions are recorded in vector (glacier.xpos,glacier.ypos).
+        
+        * In the vertical direction, particles are tracked along the ice column scaled between 
+        0 and 1 (0 at the bed, 1 at the top surface). The relative position along the ice column 
+        is recorded in vector glacier.rhpos (same dimension as glacier.xpos and iglaciergm.ypos). 
+        Particles are always initialized at 1 (assumed to be on the surface). 
+        The evolution of the particle within the ice column through time is computed according to 
+        the surface mass balance: the particle deepens when the surface mass balance is positive 
+        (then igm.rhpos decreases), and re-emerge when the surface mass balance is negative.  
+        
+        To include this feature, make sure:
+        
+        * To activate it: glacier.config.tracking_particles=True
+        
+        * To adapt the seeding to your need. You may keep the default seeding in the accumulation 
+        area setting the seeding frequency with igm.config.frequency_seeding and the seeding density 
+        glacier.config.density_seeding. Alternatively, you may define your own seeding strategy 
+        (e.g. seeding close to rock walls/nunataks). To do so, you may redefine the function seeding_particles.
+        
+        * At each time step, the weight of surface debris contains in each cell the 2D horizontal 
+        grid is computed, and stored in variable igm.weight_particles. In turn this variable can be 
+        used to melt to the presence of debris.
+        
+        * You may visualize the moving particles in update_plot(). 
+        
+        * Particles trajectories are saved in folder 'trajectory', and are organized by seeding times.
+        
+        Check at the example aletsch-1880-2100 for an example of particle tracking.
         """
 
         if self.config.verbosity == 1:
