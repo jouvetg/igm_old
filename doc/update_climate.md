@@ -15,8 +15,8 @@ Climate forcing can be easily enforced in IGM by customizing this function to yo
 
 ``` 
 
-usage:  [-h] [--clim_update_freq CLIM_UPDATE_FREQ]
-        [--type_climate TYPE_CLIMATE]
+usage: make-doc-function-md.py [-h] [--clim_update_freq CLIM_UPDATE_FREQ]
+                               [--type_climate TYPE_CLIMATE]
 
 optional arguments:
   -h, --help            show this help message and exit

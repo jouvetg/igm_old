@@ -15,7 +15,7 @@ For stability reasons of the transport scheme for the ice thickness evolution, t
 
 ``` 
 
-usage: [-h] [--cfl CFL] [--dtmax DTMAX]
+usage: make-doc-function-md.py [-h] [--cfl CFL] [--dtmax DTMAX]
 
 optional arguments:
   -h, --help     show this help message and exit

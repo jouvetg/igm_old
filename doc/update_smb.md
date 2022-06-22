@@ -21,10 +21,10 @@ IGM can use several surface mass balance model:
 
 ``` 
 
-usage:  [-h] [--mb_update_freq MB_UPDATE_FREQ]
-        [--type_mass_balance TYPE_MASS_BALANCE] [--mb_scaling MB_SCALING]
-        [--mb_simple_file MB_SIMPLE_FILE]
-        [--smb_model_lib_path SMB_MODEL_LIB_PATH]
+usage: make-doc-function-md.py [-h] [--mb_update_freq MB_UPDATE_FREQ]
+                               [--type_mass_balance TYPE_MASS_BALANCE] [--mb_scaling MB_SCALING]
+                               [--mb_simple_file MB_SIMPLE_FILE]
+                               [--smb_model_lib_path SMB_MODEL_LIB_PATH]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -37,8 +37,7 @@ optional arguments:
   --mb_simple_file MB_SIMPLE_FILE
                         mb_simple_file
   --smb_model_lib_path SMB_MODEL_LIB_PATH
-                        Model directory in case the smb model in use is
-                        'nn'for neural netowrk
+                        Model directory in case the smb model in use is 'nn'for neural netowrk
 ``` 
 
 

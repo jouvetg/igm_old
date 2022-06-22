@@ -15,14 +15,14 @@ Plot thickness, velocity, mass balance
 
 ``` 
 
-usage: [-h] [--varplot VARPLOT] [--varplot_max VARPLOT_MAX]
+usage: make-doc-function-md.py [-h] [--varplot VARPLOT] [--varplot_max VARPLOT_MAX]
 
 optional arguments:
   -h, --help            show this help message and exit
   --varplot VARPLOT     variable to plot
   --varplot_max VARPLOT_MAX
-                        maximum value of the varplot variable used to adjust
-                        the scaling of the colorbar
+                        maximum value of the varplot variable used to adjust the scaling of the
+                        colorbar
 ``` 
 
 

@@ -15,7 +15,7 @@ Initialize  and write the ncdf output file
 
 ``` 
 
-usage: [-h] [--vars_to_save VARS_TO_SAVE]
+usage: make-doc-function-md.py [-h] [--vars_to_save VARS_TO_SAVE]
 
 optional arguments:
   -h, --help            show this help message and exit

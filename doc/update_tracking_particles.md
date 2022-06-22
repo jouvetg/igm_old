@@ -33,9 +33,9 @@ Check at the example aletsch-1880-2100 for an example of particle tracking.
 
 ``` 
 
-usage:  [-h] [--tracking_particles TRACKING_PARTICLES]
-        [--frequency_seeding FREQUENCY_SEEDING]
-        [--density_seeding DENSITY_SEEDING]
+usage: make-doc-function-md.py [-h] [--tracking_particles TRACKING_PARTICLES]
+                               [--frequency_seeding FREQUENCY_SEEDING]
+                               [--density_seeding DENSITY_SEEDING]
 
 optional arguments:
   -h, --help            show this help message and exit

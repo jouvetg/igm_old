@@ -15,22 +15,21 @@ IGM permits glacier evolution modeling over time scales of million years. Over s
 
 ``` 
 
-usage:  [-h] [--erosion_include EROSION_INCLUDE] [--erosion_cst EROSION_CST]
-        [--erosion_exp EROSION_EXP]
-        [--erosion_update_freq EROSION_UPDATE_FREQ]
-        [--uplift_include UPLIFT_INCLUDE] [--uplift_rate UPLIFT_RATE]
-        [--uplift_update_freq UPLIFT_UPDATE_FREQ]
+usage: make-doc-function-md.py [-h] [--erosion_include EROSION_INCLUDE] [--erosion_cst EROSION_CST]
+                               [--erosion_exp EROSION_EXP]
+                               [--erosion_update_freq EROSION_UPDATE_FREQ]
+                               [--uplift_include UPLIFT_INCLUDE] [--uplift_rate UPLIFT_RATE]
+                               [--uplift_update_freq UPLIFT_UPDATE_FREQ]
 
 optional arguments:
   -h, --help            show this help message and exit
   --erosion_include EROSION_INCLUDE
                         Include a model for bedrock erosion
   --erosion_cst EROSION_CST
-                        Herman, F. et al. Erosion by an Alpine glacier.
-                        Science 350, 193–195 (2015)
+                        Herman, F. et al. Erosion by an Alpine glacier. Science 350, 193–195 (2015)
   --erosion_exp EROSION_EXP
-                        Herman, F. et al. Erosion by an Alpine glacier.
-                        Science 350, 193–195 (2015).
+                        Herman, F. et al. Erosion by an Alpine glacier. Science 350, 193–195
+                        (2015).
   --erosion_update_freq EROSION_UPDATE_FREQ
                         Update the erosion only each 100 years
   --uplift_include UPLIFT_INCLUDE
