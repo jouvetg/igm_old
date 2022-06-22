@@ -105,12 +105,13 @@ optional arguments:
   --uplift_update_freq UPLIFT_UPDATE_FREQ
                         Update the uplift only each 100 years
   --iceflow_model_lib_path ICEFLOW_MODEL_LIB_PATH
-                        model directory
+                        Directory path of the deep-learning ice flow model
   --multiple_window_size MULTIPLE_WINDOW_SIZE
-                        In case the mdel is a unet, it must force window size to be multiple of
-                        e.g. 8
+                        In case the ANN is a U-net, it must force window size to be multiple of
+                        e.g. 8 (default: 0)
   --force_max_velbar FORCE_MAX_VELBAR
                         This permits to artificially upper-bound velocities, active if > 0
+                        (default: 0)
   --opti_vars_to_save OPTI_VARS_TO_SAVE
                         List of variables to be recorded in the ncdef file
   --observation_file OBSERVATION_FILE
@@ -178,13 +179,13 @@ optional arguments:
                         mb_simple_file
   --smb_model_lib_path SMB_MODEL_LIB_PATH
                         Model directory in case the smb model in use is 'nn'for neural netowrk
-  --cfl CFL             CFL number must be below 1 (0.3)
-  --dtmax DTMAX         Maximum time step, used only with slow ice (10.0)
+  --cfl CFL             CFL number must be below 1 (Default: 0.3)
+  --dtmax DTMAX         Maximum time step, used only with slow ice (default: 10.0)
   --tracking_particles TRACKING_PARTICLES
-                        Is the computational of the 3D vel active?
+                        Is the particle tracking active? (Default: False)
   --frequency_seeding FREQUENCY_SEEDING
-                        Update frequency of tracking
+                        Frequency of seeding (default: 10)
   --density_seeding DENSITY_SEEDING
-                        density_seeding
+                        Density of seeding (default: 0.2)
 ``` 
 

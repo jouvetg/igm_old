@@ -16,7 +16,7 @@ To include this feature, make sure:
 
 * To adapt the seeding to your need. You may keep the default seeding in the accumulation area setting the seeding frequency with igm.config.frequency_seeding and the seeding density glacier.config.density_seeding. Alternatively, you may define your own seeding strategy (e.g. seeding close to rock walls/nunataks). To do so, you may redefine the function seeding_particles.
 
-* At each time step, the weight of surface debris contains in each cell the 2D horizontal grid is computed, and stored in variable igm.weight_particles. In turn this variable can be used to melt to the presence of debris.
+* At each time step, the weight of surface debris contains in each cell the 2D horizontal grid is computed, and stored in variable igm.weight_particles.
 
 * You may visualize the moving particles in update_plot(). 
 
@@ -38,11 +38,11 @@ usage: make-doc-function-md.py [-h] [--tracking_particles TRACKING_PARTICLES]
 optional arguments:
   -h, --help            show this help message and exit
   --tracking_particles TRACKING_PARTICLES
-                        Is the computational of the 3D vel active?
+                        Is the particle tracking active? (Default: False)
   --frequency_seeding FREQUENCY_SEEDING
-                        Update frequency of tracking
+                        Frequency of seeding (default: 10)
   --density_seeding DENSITY_SEEDING
-                        density_seeding
+                        Density of seeding (default: 0.2)
 ``` 
 
 
@@ -66,7 +66,7 @@ optional arguments:
         
         * To adapt the seeding to your need. You may keep the default seeding in the accumulation area setting the seeding frequency with igm.config.frequency_seeding and the seeding density glacier.config.density_seeding. Alternatively, you may define your own seeding strategy (e.g. seeding close to rock walls/nunataks). To do so, you may redefine the function seeding_particles.
         
-        * At each time step, the weight of surface debris contains in each cell the 2D horizontal grid is computed, and stored in variable igm.weight_particles. In turn this variable can be used to melt to the presence of debris.
+        * At each time step, the weight of surface debris contains in each cell the 2D horizontal grid is computed, and stored in variable igm.weight_particles.
         
         * You may visualize the moving particles in update_plot(). 
         

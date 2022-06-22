@@ -538,13 +538,13 @@ class Igm:
 
         # NUMERICL PARAMETER FOR TIME STEP
         self.parser.add_argument(
-            "--cfl", type=float, default=0.3, help="CFL number must be below 1 (0.3)"
+            "--cfl", type=float, default=0.3, help="CFL number must be below 1 (Default: 0.3)"
         )
         self.parser.add_argument(
             "--dtmax",
             type=float,
             default=10.0,
-            help="Maximum time step, used only with slow ice (10.0)",
+            help="Maximum time step, used only with slow ice (default: 10.0)",
         )
 
     def update_t_dt(self):
@@ -664,20 +664,20 @@ class Igm:
         self.parser.add_argument(
             "--iceflow_model_lib_path",
             type=str,
-            default="/home/jouvetg/IGM/model-lib/f12_cfsflow",
-            help="model directory",
+            default="../../model-lib/f15_cfsflow_GJ_22_a",
+            help="Directory path of the deep-learning ice flow model",
         )
         self.parser.add_argument(
             "--multiple_window_size",
             type=int,
             default=0,
-            help="In case the mdel is a unet, it must force window size to be multiple of e.g. 8",
+            help="In case the ANN is a U-net, it must force window size to be multiple of e.g. 8 (default: 0)",
         )
         self.parser.add_argument(
             "--force_max_velbar",
             type=float,
             default=0,
-            help="This permits to artificially upper-bound velocities, active if > 0",
+            help="This permits to artificially upper-bound velocities, active if > 0 (default: 0)",
         )
 
     def initialize_iceflow(self):
@@ -1221,18 +1221,18 @@ class Igm:
             "--tracking_particles",
             type=int,
             default=False,
-            help="Is the computational of the 3D vel active?",
+            help="Is the particle tracking active? (Default: False)",
         )
 
         self.parser.add_argument(
             "--frequency_seeding",
             type=int,
             default=10,
-            help="Update frequency of tracking",
+            help="Frequency of seeding (default: 10)",
         )
 
         self.parser.add_argument(
-            "--density_seeding", type=int, default=0.2, help="density_seeding",
+            "--density_seeding", type=int, default=0.2, help="Density of seeding (default: 0.2)",
         )
 
     def seeding_particles(self):
@@ -1281,7 +1281,7 @@ class Igm:
         
         * To adapt the seeding to your need. You may keep the default seeding in the accumulation area setting the seeding frequency with igm.config.frequency_seeding and the seeding density glacier.config.density_seeding. Alternatively, you may define your own seeding strategy (e.g. seeding close to rock walls/nunataks). To do so, you may redefine the function seeding_particles.
         
-        * At each time step, the weight of surface debris contains in each cell the 2D horizontal grid is computed, and stored in variable igm.weight_particles. In turn this variable can be used to melt to the presence of debris.
+        * At each time step, the weight of surface debris contains in each cell the 2D horizontal grid is computed, and stored in variable igm.weight_particles.
         
         * You may visualize the moving particles in update_plot(). 
         

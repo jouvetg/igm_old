@@ -17,8 +17,8 @@ usage: make-doc-function-md.py [-h] [--cfl CFL] [--dtmax DTMAX]
 
 optional arguments:
   -h, --help     show this help message and exit
-  --cfl CFL      CFL number must be below 1 (0.3)
-  --dtmax DTMAX  Maximum time step, used only with slow ice (10.0)
+  --cfl CFL      CFL number must be below 1 (Default: 0.3)
+  --dtmax DTMAX  Maximum time step, used only with slow ice (default: 10.0)
 ``` 
 
 
