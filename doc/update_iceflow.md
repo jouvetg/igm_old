@@ -3,9 +3,7 @@
 ### <h1 align="center" id="title"> Documentation of update_iceflow </h1>
 
 
-Help on method update_iceflow in module igm:
 
-update_iceflow() method of igm.Igm instance
 Ice flow dynamics are modeled using Artificial Neural Networks trained from physical models.
 
 You may find trained and ready-to-use ice flow emulators in the folder `model-lib/T_M_I_Y_V/R/`, where 'T_M_I_Y_V' defines the emulator, and R defines the spatial resolution. Make sure that the resolution of the picked emulator is available in the database. Results produced with IGM will strongly rely on the chosen emulator. Make sure that you use the emulator within the hull of its training dataset (e.g., do not model an ice sheet with an emulator trained with mountain glaciers) to ensure reliability (or fidelity w.r.t to the instructor model) -- the emulator is probably much better at interpolating than at extrapolating. Information on the training dataset is provided in a dedicated README coming along with the emulator.

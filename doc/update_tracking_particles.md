@@ -3,9 +3,7 @@
 ### <h1 align="center" id="title"> Documentation of update_tracking_particles </h1>
 
 
-Help on method update_tracking_particles in module igm:
 
-update_tracking_particles() method of igm.Igm instance
 IGM includes a particle tracking routine, which can compute a large number of trajectories (as it is implemented with TensorFlow to run in parallel) in live time during the forward model run. The routine produces some seeding of particles (by default in the accumulation area at regular intervals), and computes the time trajectory of the resulting particle in time advected by the velocity field in 3D. Horizontal and vertical directions are treated differently:
 
 * In the horizontal plan, particles are advected with the horizontal velocity field (interpolated bi-linearly). The positions are recorded in vector (glacier.xpos,glacier.ypos).

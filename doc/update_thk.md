@@ -3,9 +3,7 @@
 ### <h1 align="center" id="title"> Documentation of update_thk </h1>
 
 
-Help on method update_thk in module igm:
 
-update_thk() method of igm.Igm instance
 The mass conservation equation is solved using an explicit first-order upwind finite-volume scheme on a regular 2D grid with constant cell spacing in any direction. The discretization and the approximation of the flux divergence is described [here](https://github.com/jouvetg/igm/blob/main/fig/transp-igm.jpg). With this scheme mass of ice is allowed to move from cell to cell (where thickness and velocities are defined) from edge-defined fluxes (inferred from depth-averaged velocities, and ice thickness in upwind direction). The resulting scheme is mass conservative and parallelizable (because fully explicit). However, it is subject to a CFL condition. This means that the time step (defined in glacier.update_t_dt()) is controlled by parameter glacier.config.cfl, which is the maximum number of cells crossed in one iteration (this parameter cannot exceed one).
 
 

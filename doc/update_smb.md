@@ -3,9 +3,7 @@
 ### <h1 align="center" id="title"> Documentation of update_smb </h1>
 
 
-Help on method update_smb in module igm:
 
-update_smb(force=False) method of igm.Igm instance
 IGM can use several surface mass balance model:
 
 * IGM comes with a very simple mass balance model based on a few parameters (ELA, ...). 

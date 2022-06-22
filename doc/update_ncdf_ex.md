@@ -3,9 +3,7 @@
 ### <h1 align="center" id="title"> Documentation of update_ncdf_ex </h1>
 
 
-Help on method update_ncdf_ex in module igm:
 
-update_ncdf_ex(force=False) method of igm.Igm instance
 Initialize  and write the ncdf output file
 
 

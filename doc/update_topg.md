@@ -3,9 +3,7 @@
 ### <h1 align="center" id="title"> Documentation of update_topg </h1>
 
 
-Help on method update_topg in module igm:
 
-update_topg() method of igm.Igm instance
 IGM permits glacier evolution modeling over time scales of million years. Over such a time scale glacial erosion or uplift may change the basal topography substantially. Setting glacier.config.erosion_include=True, the bedrock is updated (each glacier.config.erosion_update_freq years) assuming the erosion rate to be proportional (parameter glacier.config.erosion_cst) to a power (parameter glacier.config.erosion_exp) of the sliding velocity magnitude. By default, we use the parameters from Herman, F. et al. Erosion by an Alpine glacier. Science 350, 193–195 (2015). Check at the function glacier.update_topg() for more details on the implementation of glacial erosion in IGM. Setting glacier.config.uplift_include=True will allow to include an uplift defined by glacier.config.uplift_rate.
 
 

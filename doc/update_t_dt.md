@@ -3,9 +3,7 @@
 ### <h1 align="center" id="title"> Documentation of update_t_dt </h1>
 
 
-Help on method update_t_dt in module igm:
 
-update_t_dt() method of igm.Igm instance
 For stability reasons of the transport scheme for the ice thickness evolution, the time step must respect a CFL condition, controlled by parameter glacier.config.cfl, which is the maximum number of cells crossed in one iteration (this parameter cannot exceed one). Function glacier.update_t_dt() return time step dt, updated time t, and a boolean telling whether results must be saved or not.
 
 
