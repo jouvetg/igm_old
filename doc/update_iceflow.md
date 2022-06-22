@@ -12,7 +12,7 @@ At the time of writing, I recommend using *f15_cfsflow_GJ_22_a*, which takes ice
 
 ![](https://github.com/jouvetg/igm/blob/main/fig/mapping-f15.png)
 
-I have trained *f17_cfsflow_GJ_22_a* using a large dataset of modeled glaciers (based on a Stokes-based CfsFlow ice flow solver) and varying sliding coefficient c, and Arrhenius factor A into a 2D space. 
+I have trained *f15_cfsflow_GJ_22_a* using a large dataset of modeled glaciers (based on a Stokes-based CfsFlow ice flow solver) and varying sliding coefficient c, and Arrhenius factor A into a 2D space. 
 
 For now, only the emulator trained by CfsFlow and PISM is available with different resolutions. Consider training your own with the [Deep Learning Emulator](https://github.com/jouvetg/dle) if none of these emulators fill your need.
 
@@ -55,7 +55,7 @@ optional arguments:
         
         ![](https://github.com/jouvetg/igm/blob/main/fig/mapping-f15.png)
         
-        I have trained *f17_cfsflow_GJ_22_a* using a large dataset of modeled glaciers (based on a Stokes-based CfsFlow ice flow solver) and varying sliding coefficient c, and Arrhenius factor A into a 2D space. 
+        I have trained *f15_cfsflow_GJ_22_a* using a large dataset of modeled glaciers (based on a Stokes-based CfsFlow ice flow solver) and varying sliding coefficient c, and Arrhenius factor A into a 2D space. 
         
         For now, only the emulator trained by CfsFlow and PISM is available with different resolutions. Consider training your own with the [Deep Learning Emulator](https://github.com/jouvetg/dle) if none of these emulators fill your need.
         """

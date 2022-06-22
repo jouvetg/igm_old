@@ -50,12 +50,14 @@ optional arguments:
         IGM permits glacier evolution modeling over time scales of million years. Over such a time scale glacial erosion or uplift may change the basal topography substantially. Setting glacier.config.erosion_include=True, the bedrock is updated (each glacier.config.erosion_update_freq years) assuming the erosion rate to be proportional (parameter glacier.config.erosion_cst) to a power (parameter glacier.config.erosion_exp) of the sliding velocity magnitude. By default, we use the parameters from Herman, F. et al. Erosion by an Alpine glacier. Science 350, 193–195 (2015). Check at the function glacier.update_topg() for more details on the implementation of glacial erosion in IGM. Setting glacier.config.uplift_include=True will allow to include an uplift defined by glacier.config.uplift_rate.
         """
 
-        if not hasattr(self, "already_called_update_topg"):
-            self.tlast_erosion = self.config.tstart
-            self.tlast_uplift = self.config.tstart
-            self.tcomp["Erosion"] = []
-            self.tcomp["Uplift"] = []
-            self.already_called_update_topg = True
+        if (self.config.erosion_include)|(self.config.uplift_include):
+
+            if not hasattr(self, "already_called_update_topg"):
+                self.tlast_erosion = self.config.tstart
+                self.tlast_uplift = self.config.tstart
+                self.tcomp["Erosion"] = []
+                self.tcomp["Uplift"] = []
+                self.already_called_update_topg = True
 
         if self.config.erosion_include:
 

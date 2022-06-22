@@ -3,9 +3,7 @@
 ### <h1 align="center" id="title"> Documentation of optimize </h1>
 
 
-Help on method optimize in module igm:
 
-optimize() method of igm.Igm instance
 This is the optimization routine to invert thk, strflowctrl ans usurf from data
 DEFAULT PARAMETERS ARE
 # nbitmin=50, nbitmax=1000, opti_step_size=0.001,

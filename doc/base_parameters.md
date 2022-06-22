@@ -14,11 +14,10 @@ usage: make-doc-function-md.py [-h] [--working_dir WORKING_DIR] [--geology_file 
                                [--usegpu USEGPU] [--stop STOP]
                                [--init_strflowctrl INIT_STRFLOWCTRL]
                                [--init_slidingco INIT_SLIDINGCO] [--init_arrhenius INIT_ARRHENIUS]
-                               [--optimize OPTIMIZE] [--update_topg UPDATE_TOPG]
-                               [--vel3d_active VEL3D_ACTIVE] [--dz DZ] [--maxthk MAXTHK]
-                               [--clim_update_freq CLIM_UPDATE_FREQ] [--type_climate TYPE_CLIMATE]
-                               [--erosion_include EROSION_INCLUDE] [--erosion_cst EROSION_CST]
-                               [--erosion_exp EROSION_EXP]
+                               [--optimize OPTIMIZE] [--vel3d_active VEL3D_ACTIVE] [--dz DZ]
+                               [--maxthk MAXTHK] [--clim_update_freq CLIM_UPDATE_FREQ]
+                               [--type_climate TYPE_CLIMATE] [--erosion_include EROSION_INCLUDE]
+                               [--erosion_cst EROSION_CST] [--erosion_exp EROSION_EXP]
                                [--erosion_update_freq EROSION_UPDATE_FREQ]
                                [--uplift_include UPLIFT_INCLUDE] [--uplift_rate UPLIFT_RATE]
                                [--uplift_update_freq UPLIFT_UPDATE_FREQ]
@@ -81,16 +80,15 @@ optional arguments:
   --init_arrhenius INIT_ARRHENIUS
                         Initial arrhenius
   --optimize OPTIMIZE   Optimize prior forward modelling (not available yet)
-  --update_topg UPDATE_TOPG
-                        Update bedrock (not available yet)
   --vel3d_active VEL3D_ACTIVE
                         Is the computational of the 3D vel active?
   --dz DZ               Vertical discretization constant spacing
   --maxthk MAXTHK       Vertical maximum thickness
   --clim_update_freq CLIM_UPDATE_FREQ
-                        Update the climate each X years (1)
+                        Update the climate each X years (default: 1)
   --type_climate TYPE_CLIMATE
-                        toy or any custom climate
+                        This keywork serves to identify & call the climate forcing. If an empty
+                        string, this function is not called (Default: )
   --erosion_include EROSION_INCLUDE
                         Include a model for bedrock erosion
   --erosion_cst EROSION_CST

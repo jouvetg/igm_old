@@ -42,9 +42,7 @@ from scipy import stats
 def str2bool(v):
     return v.lower() in ("true", "1")
 
-
 ####################################################################################
-
 
 class Igm:
 
@@ -135,12 +133,6 @@ class Igm:
             type=str2bool,
             default=False,
             help="Optimize prior forward modelling  (not available yet)",
-        )
-        self.parser.add_argument(
-            "--update_topg",
-            type=str2bool,
-            default=False,
-            help="Update bedrock (not available yet)",
         )
 
         for p in dir(self):
@@ -734,7 +726,7 @@ class Igm:
         
         ![](https://github.com/jouvetg/igm/blob/main/fig/mapping-f15.png)
         
-        I have trained *f17_cfsflow_GJ_22_a* using a large dataset of modeled glaciers (based on a Stokes-based CfsFlow ice flow solver) and varying sliding coefficient c, and Arrhenius factor A into a 2D space. 
+        I have trained *f15_cfsflow_GJ_22_a* using a large dataset of modeled glaciers (based on a Stokes-based CfsFlow ice flow solver) and varying sliding coefficient c, and Arrhenius factor A into a 2D space. 
         
         For now, only the emulator trained by CfsFlow and PISM is available with different resolutions. Consider training your own with the [Deep Learning Emulator](https://github.com/jouvetg/dle) if none of these emulators fill your need.
         """
@@ -808,15 +800,15 @@ class Igm:
             "--clim_update_freq",
             type=float,
             default=1,
-            help="Update the climate each X years (1)",
+            help="Update the climate each X years (default: 1)",
         )
         self.parser.add_argument(
-            "--type_climate", type=str, default="", help="toy or any custom climate",
+            "--type_climate", type=str, default="", help="This keywork serves to identify & call the climate forcing. If an empty string, this function is not called (Default: "")",
         )
 
     def update_climate(self, force=False):
         """
-        Climate forcing can be easily enforced in IGM by customizing this function to your needs, e.g., building fields of temperature and precipitation, which can be used by an accumulation/melt model (PDD-like) model. Check at the aletsch-1880-21000 example.
+        This function serves to define a climate forcing (e.g. monthly temperature and precipitation fields) to be used for the surface mass balance model (e.g. accumulation/melt PDD-like model). No climate forcing is provided with IGM is this is case-dependent. Check at the aletsch-1880-21000 example.
         """
 
         if len(self.config.type_climate) > 0:
@@ -986,13 +978,13 @@ class Igm:
 
     def update_smb(self, force=False):
         """
-        IGM can use several surface mass balance model:
-        
-        * IGM comes with a very simple mass balance model based on a few parameters (ELA, ...). 
-        
-        * Users can build their own mass balance routines relatively easily, and possibly combine them with a climate routine (see Climate model below). E.g. in the aletsch-1880-21000 example, both climate and surface mass balance models were customized to implement i) the computation of daily temperature and precipitation 2D fields ii) an accumulation/melt model (PDD-like) that takes the climate input, and transforms them into effective surface mass balance.
-        
-        * The structure of IGM facilitates the embedding of further emulators beyond the ice flow model assuming that it maps 2D gridded fields to 2D gridded fields similar to the ice flow one. This applies to predicting surface mass balance from temperature and precipitation fields. IGM permits embedding a neural network emulator to model mass balance. As an illustration, I have trained a Convolutional Neural Network (CNN) from climate and mass balance data from glaciers in the Alps using the [Deep Learning Emulator](https://github.com/jouvetg/dle). To try it, check the example aletsch-1880-2100. Note that this is highly experimental considering that so far i) the training dataset is small ii) CNN is overkilled here iii) no assessment was done.
+        IGM can use several surface mass balance models:
+                
+        * A very simple mass balance model based on a few parameters (ELA, ...), whose parameters are defined in file glacier.config.mb_simple_file. This surface mass balance is provided with IGM.
+                
+        * Users can build their own mass balance routine, and possibly combine them with a climate routine. E.g. in the aletsch-1880-21000 example, both climate and surface mass balance models were customized to implement i) the computation of daily temperature and precipitation 2D fields ii) an accumulation/melt model (PDD-like) that takes the climate input, and transforms them into effective surface mass balance.
+                
+        * Surface Mass balance can be given in the form of a neural network, which predicts surface mass balance from temperature and precipitation fields. As an illustration, I have trained a Neural Network from climate and mass balance data from glaciers in the Alps using the [Deep Learning Emulator](https://github.com/jouvetg/dle). To try it, check the example aletsch-1880-2100. Note that this is highly experimental considering that so far i) the training dataset is small ii) no assessment was done.
         """
 
         if not hasattr(self, "already_called_update_smb"):
@@ -1085,12 +1077,14 @@ class Igm:
         IGM permits glacier evolution modeling over time scales of million years. Over such a time scale glacial erosion or uplift may change the basal topography substantially. Setting glacier.config.erosion_include=True, the bedrock is updated (each glacier.config.erosion_update_freq years) assuming the erosion rate to be proportional (parameter glacier.config.erosion_cst) to a power (parameter glacier.config.erosion_exp) of the sliding velocity magnitude. By default, we use the parameters from Herman, F. et al. Erosion by an Alpine glacier. Science 350, 193–195 (2015). Check at the function glacier.update_topg() for more details on the implementation of glacial erosion in IGM. Setting glacier.config.uplift_include=True will allow to include an uplift defined by glacier.config.uplift_rate.
         """
 
-        if not hasattr(self, "already_called_update_topg"):
-            self.tlast_erosion = self.config.tstart
-            self.tlast_uplift = self.config.tstart
-            self.tcomp["Erosion"] = []
-            self.tcomp["Uplift"] = []
-            self.already_called_update_topg = True
+        if (self.config.erosion_include)|(self.config.uplift_include):
+
+            if not hasattr(self, "already_called_update_topg"):
+                self.tlast_erosion = self.config.tstart
+                self.tlast_uplift = self.config.tstart
+                self.tcomp["Erosion"] = []
+                self.tcomp["Uplift"] = []
+                self.already_called_update_topg = True
 
         if self.config.erosion_include:
 
@@ -1295,138 +1289,143 @@ class Igm:
         
         Check at the example aletsch-1880-2100 for an example of particle tracking.
         """
-
-        if self.config.verbosity == 1:
-            print("Update TRACKING at time : ", self.t)
-
-        if not hasattr(self, "already_called_update_tracking"):
-            self.already_called_update_tracking = True
-            self.tlast_seeding = -1.0e5000
-            self.tcomp["Tracking"] = []
-
-            # initialize trajectories
-            self.xpos = tf.Variable([])
-            self.ypos = tf.Variable([])
-            self.rhpos = tf.Variable([])
-            self.wpos = tf.Variable([])
-
-            # build the gridseed
-            self.gridseed = np.zeros_like(self.thk) == 1
-            rr = int(1.0 / self.config.density_seeding)
-            self.gridseed[::rr, ::rr] = True
-
-            directory = os.path.join(self.config.working_dir, "trajectories")
-            if os.path.exists(directory):
-                shutil.rmtree(directory)
-            os.mkdir(directory)
-
-            self.seedtimes = []
-
-        else:
-
-            if (self.t.numpy() - self.tlast_seeding) >= self.config.frequency_seeding:
-                self.seeding_particles()
-
-                # merge the new seeding points with the former ones
-                self.xpos = tf.Variable(tf.concat([self.xpos, self.nxpos], axis=-1))
-                self.ypos = tf.Variable(tf.concat([self.ypos, self.nypos], axis=-1))
-                self.rhpos = tf.Variable(tf.concat([self.rhpos, self.nrhpos], axis=-1))
-                self.wpos = tf.Variable(tf.concat([self.wpos, self.nwpos], axis=-1))
-
-                self.tlast_seeding = self.t.numpy()
-                self.seedtimes.append([self.t.numpy(), self.xpos.shape[0]])
-
-            self.tcomp["Tracking"].append(time.time())
-
-            # find the indices of trajectories
-            # these indicies are real values to permit 2D interpolations
-            i = (self.xpos - self.x[0]) / self.dx
-            j = (self.ypos - self.y[0]) / self.dx
-
-            indices = tf.expand_dims(
-                tf.concat(
-                    [tf.expand_dims(j, axis=-1), tf.expand_dims(i, axis=-1)], axis=-1
-                ),
-                axis=0,
-            )
-
-            import tensorflow_addons as tfa
-
-            uvelbase = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.uvelbase, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
-            vvelbase = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.vvelbase, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
-            uvelsurf = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.uvelsurf, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
-            vvelsurf = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.vvelsurf, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
-            othk = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.thk, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
-            smb = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.smb, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
-            nthk = othk + smb * self.dt  # new ice thicnkess after smb update
-
-            # adjust the relative height within the ice column with smb
-            self.rhpos.assign(
-                tf.where(
-                    nthk > 0.1, tf.clip_by_value(self.rhpos * othk / nthk, 0, 1), 1
+        
+        if self.config.tracking_particles:
+    
+            if self.config.verbosity == 1:
+                print("Update TRACKING at time : ", self.t)
+    
+            if not hasattr(self, "already_called_update_tracking"):
+                self.already_called_update_tracking = True
+                self.tlast_seeding = -1.0e5000
+                self.tcomp["Tracking"] = []
+    
+                # initialize trajectories
+                self.xpos = tf.Variable([])
+                self.ypos = tf.Variable([])
+                self.rhpos = tf.Variable([])
+                self.wpos = tf.Variable([])
+    
+                # build the gridseed
+                self.gridseed = np.zeros_like(self.thk) == 1
+                rr = int(1.0 / self.config.density_seeding)
+                self.gridseed[::rr, ::rr] = True
+    
+                directory = os.path.join(self.config.working_dir, "trajectories")
+                if os.path.exists(directory):
+                    shutil.rmtree(directory)
+                os.mkdir(directory)
+    
+                self.seedtimes = []
+    
+            else:
+    
+                if (self.t.numpy() - self.tlast_seeding) >= self.config.frequency_seeding:
+                    self.seeding_particles()
+    
+                    # merge the new seeding points with the former ones
+                    self.xpos = tf.Variable(tf.concat([self.xpos, self.nxpos], axis=-1))
+                    self.ypos = tf.Variable(tf.concat([self.ypos, self.nypos], axis=-1))
+                    self.rhpos = tf.Variable(tf.concat([self.rhpos, self.nrhpos], axis=-1))
+                    self.wpos = tf.Variable(tf.concat([self.wpos, self.nwpos], axis=-1))
+    
+                    self.tlast_seeding = self.t.numpy()
+                    self.seedtimes.append([self.t.numpy(), self.xpos.shape[0]])
+    
+                self.tcomp["Tracking"].append(time.time())
+    
+                # find the indices of trajectories
+                # these indicies are real values to permit 2D interpolations
+                i = (self.xpos - self.x[0]) / self.dx
+                j = (self.ypos - self.y[0]) / self.dx
+    
+                indices = tf.expand_dims(
+                    tf.concat(
+                        [tf.expand_dims(j, axis=-1), tf.expand_dims(i, axis=-1)], axis=-1
+                    ),
+                    axis=0,
                 )
-            )
+    
+                import tensorflow_addons as tfa
+    
+                uvelbase = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.uvelbase, axis=0), axis=-1),
+                    indices,
+                    indexing="ij",
+                )[0, :, 0]
+    
+                vvelbase = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.vvelbase, axis=0), axis=-1),
+                    indices,
+                    indexing="ij",
+                )[0, :, 0]
+    
+                uvelsurf = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.uvelsurf, axis=0), axis=-1),
+                    indices,
+                    indexing="ij",
+                )[0, :, 0]
+    
+                vvelsurf = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.vvelsurf, axis=0), axis=-1),
+                    indices,
+                    indexing="ij",
+                )[0, :, 0]
+    
+                othk = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.thk, axis=0), axis=-1),
+                    indices,
+                    indexing="ij",
+                )[0, :, 0]
+    
+                smb = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.smb, axis=0), axis=-1),
+                    indices,
+                    indexing="ij",
+                )[0, :, 0]
+    
+                nthk = othk + smb * self.dt  # new ice thicnkess after smb update
+    
+                # adjust the relative height within the ice column with smb
+                self.rhpos.assign(
+                    tf.where(
+                        nthk > 0.1, tf.clip_by_value(self.rhpos * othk / nthk, 0, 1), 1
+                    )
+                )
+    
+                uvel = uvelbase + (uvelsurf - uvelbase) * (
+                    1 - (1 - self.rhpos) ** 4
+                )  # SIA-like
+                vvel = vvelbase + (vvelsurf - vvelbase) * (
+                    1 - (1 - self.rhpos) ** 4
+                )  # SIA-like
+    
+                self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
+                self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler
+    
+                # THIS WAS IMPLMENTED BY MISTAKE BEFORE; WE NO LONGER USE THE VERTICAL VELOCITY
+                # adjust the relative height within the ice column with the verticial velocity
+                # self.rhpos.assign(tf.where(nthk>0.1,
+                #                             tf.clip_by_value((self.rhpos*nthk+self.dt*wvel)/nthk,0,1),
+                #                             1))
+    
+                indices = tf.concat(
+                    [
+                        tf.expand_dims(tf.cast(j, dtype="int32"), axis=-1),
+                        tf.expand_dims(tf.cast(i, dtype="int32"), axis=-1),
+                    ],
+                    axis=-1,
+                )
+                updates = tf.cast(tf.where(self.rhpos == 1, self.wpos, 0), dtype="float32")
+                self.weight_particles = tf.tensor_scatter_nd_add(
+                    tf.zeros_like(self.thk), indices, updates
+                )
 
-            uvel = uvelbase + (uvelsurf - uvelbase) * (
-                1 - (1 - self.rhpos) ** 4
-            )  # SIA-like
-            vvel = vvelbase + (vvelsurf - vvelbase) * (
-                1 - (1 - self.rhpos) ** 4
-            )  # SIA-like
-
-            self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
-            self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler
-
-            # THIS WAS IMPLMENTED BY MISTAKE BEFORE; WE NO LONGER USE THE VERTICAL VELOCITY
-            # adjust the relative height within the ice column with the verticial velocity
-            # self.rhpos.assign(tf.where(nthk>0.1,
-            #                             tf.clip_by_value((self.rhpos*nthk+self.dt*wvel)/nthk,0,1),
-            #                             1))
-
-            indices = tf.concat(
-                [
-                    tf.expand_dims(tf.cast(j, dtype="int32"), axis=-1),
-                    tf.expand_dims(tf.cast(i, dtype="int32"), axis=-1),
-                ],
-                axis=-1,
-            )
-            updates = tf.cast(tf.where(self.rhpos == 1, self.wpos, 0), dtype="float32")
-            self.weight_particles = tf.tensor_scatter_nd_add(
-                tf.zeros_like(self.thk), indices, updates
-            )
-
-            self.tcomp["Tracking"][-1] -= time.time()
-            self.tcomp["Tracking"][-1] *= -1
+                self.update_write_trajectories()
+    
+                self.tcomp["Tracking"][-1] -= time.time()
+                self.tcomp["Tracking"][-1] *= -1
+                
 
     def update_write_trajectories(self):
 
@@ -3497,30 +3496,12 @@ class Igm:
             if len(self.config.restartingfile) > 0:
                 self.restart(-1)
 
-            #            self.initialize_iceflow()  # TO BE REMOVED
-
-            #            self.update_climate()      # TO BE REMOVED
-            #            self.update_smb()          # TO BE REMOVED
-
             if self.config.optimize:
                 self.optimize()
-
-            # TO BE REMOVED
-            # self.update_iceflow()
-            # if self.config.tracking_particles:
-            #     self.update_tracking_particles()
-            # self.update_ncdf_ex()
-            # self.update_ncdf_ts()
-            # if self.config.vel3d_active:
-            #     self.init_3dvel()
-            # self.print_info()
 
             while self.t.numpy() < self.config.tend:
 
                 self.tcomp["All"].append(time.time())
-
-                if self.config.vel3d_active:
-                    self.update_3dvel()
 
                 self.update_climate()
 
@@ -3528,16 +3509,13 @@ class Igm:
 
                 self.update_iceflow()
 
-                if self.config.tracking_particles:
-                    self.update_tracking_particles()
-                    self.update_write_trajectories()
+                self.update_tracking_particles()
 
                 self.update_t_dt()
 
                 self.update_thk()
 
-                if self.config.update_topg:
-                    self.update_topg()
+                self.update_topg()
 
                 self.update_ncdf_ex()
 
@@ -3551,7 +3529,6 @@ class Igm:
                 self.tcomp["All"][-1] *= -1
 
         self.print_all_comp_info()
-
 
 ####################################################################################
 ####################################################################################

@@ -4,13 +4,13 @@
 
 
 
-IGM can use several surface mass balance model:
+IGM can use several surface mass balance models:
 
-* IGM comes with a very simple mass balance model based on a few parameters (ELA, ...). 
+* A very simple mass balance model based on a few parameters (ELA, ...), whose parameters are defined in file glacier.config.mb_simple_file. This surface mass balance is provided with IGM.
 
-* Users can build their own mass balance routines relatively easily, and possibly combine them with a climate routine (see Climate model below). E.g. in the aletsch-1880-21000 example, both climate and surface mass balance models were customized to implement i) the computation of daily temperature and precipitation 2D fields ii) an accumulation/melt model (PDD-like) that takes the climate input, and transforms them into effective surface mass balance.
+* Users can build their own mass balance routine, and possibly combine them with a climate routine. E.g. in the aletsch-1880-21000 example, both climate and surface mass balance models were customized to implement i) the computation of daily temperature and precipitation 2D fields ii) an accumulation/melt model (PDD-like) that takes the climate input, and transforms them into effective surface mass balance.
 
-* The structure of IGM facilitates the embedding of further emulators beyond the ice flow model assuming that it maps 2D gridded fields to 2D gridded fields similar to the ice flow one. This applies to predicting surface mass balance from temperature and precipitation fields. IGM permits embedding a neural network emulator to model mass balance. As an illustration, I have trained a Convolutional Neural Network (CNN) from climate and mass balance data from glaciers in the Alps using the [Deep Learning Emulator](https://github.com/jouvetg/dle). To try it, check the example aletsch-1880-2100. Note that this is highly experimental considering that so far i) the training dataset is small ii) CNN is overkilled here iii) no assessment was done.
+* Surface Mass balance can be given in the form of a neural network, which predicts surface mass balance from temperature and precipitation fields. As an illustration, I have trained a Neural Network from climate and mass balance data from glaciers in the Alps using the [Deep Learning Emulator](https://github.com/jouvetg/dle). To try it, check the example aletsch-1880-2100. Note that this is highly experimental considering that so far i) the training dataset is small ii) no assessment was done.
 
 
 
@@ -47,13 +47,13 @@ optional arguments:
 
     def update_smb(self, force=False):
         """
-        IGM can use several surface mass balance model:
-        
-        * IGM comes with a very simple mass balance model based on a few parameters (ELA, ...). 
-        
-        * Users can build their own mass balance routines relatively easily, and possibly combine them with a climate routine (see Climate model below). E.g. in the aletsch-1880-21000 example, both climate and surface mass balance models were customized to implement i) the computation of daily temperature and precipitation 2D fields ii) an accumulation/melt model (PDD-like) that takes the climate input, and transforms them into effective surface mass balance.
-        
-        * The structure of IGM facilitates the embedding of further emulators beyond the ice flow model assuming that it maps 2D gridded fields to 2D gridded fields similar to the ice flow one. This applies to predicting surface mass balance from temperature and precipitation fields. IGM permits embedding a neural network emulator to model mass balance. As an illustration, I have trained a Convolutional Neural Network (CNN) from climate and mass balance data from glaciers in the Alps using the [Deep Learning Emulator](https://github.com/jouvetg/dle). To try it, check the example aletsch-1880-2100. Note that this is highly experimental considering that so far i) the training dataset is small ii) CNN is overkilled here iii) no assessment was done.
+        IGM can use several surface mass balance models:
+                
+        * A very simple mass balance model based on a few parameters (ELA, ...), whose parameters are defined in file glacier.config.mb_simple_file. This surface mass balance is provided with IGM.
+                
+        * Users can build their own mass balance routine, and possibly combine them with a climate routine. E.g. in the aletsch-1880-21000 example, both climate and surface mass balance models were customized to implement i) the computation of daily temperature and precipitation 2D fields ii) an accumulation/melt model (PDD-like) that takes the climate input, and transforms them into effective surface mass balance.
+                
+        * Surface Mass balance can be given in the form of a neural network, which predicts surface mass balance from temperature and precipitation fields. As an illustration, I have trained a Neural Network from climate and mass balance data from glaciers in the Alps using the [Deep Learning Emulator](https://github.com/jouvetg/dle). To try it, check the example aletsch-1880-2100. Note that this is highly experimental considering that so far i) the training dataset is small ii) no assessment was done.
         """
 
         if not hasattr(self, "already_called_update_smb"):

@@ -3,9 +3,7 @@
 ### <h1 align="center" id="title"> Documentation of update_plot </h1>
 
 
-Help on method update_plot in module igm:
 
-update_plot(force=False) method of igm.Igm instance
 Plot thickness, velocity, mass balance
 
 

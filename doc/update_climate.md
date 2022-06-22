@@ -4,7 +4,7 @@
 
 
 
-Climate forcing can be easily enforced in IGM by customizing this function to your needs, e.g., building fields of temperature and precipitation, which can be used by an accumulation/melt model (PDD-like) model. Check at the aletsch-1880-21000 example.
+This function serves to define a climate forcing (e.g. monthly temperature and precipitation fields) to be used for the surface mass balance model (e.g. accumulation/melt PDD-like model). No climate forcing is provided with IGM is this is case-dependent. Check at the aletsch-1880-21000 example.
 
 
 
@@ -19,9 +19,10 @@ usage: make-doc-function-md.py [-h] [--clim_update_freq CLIM_UPDATE_FREQ]
 optional arguments:
   -h, --help            show this help message and exit
   --clim_update_freq CLIM_UPDATE_FREQ
-                        Update the climate each X years (1)
+                        Update the climate each X years (default: 1)
   --type_climate TYPE_CLIMATE
-                        toy or any custom climate
+                        This keywork serves to identify & call the climate forcing. If an empty
+                        string, this function is not called (Default: )
 ``` 
 
 
@@ -33,7 +34,7 @@ optional arguments:
 
     def update_climate(self, force=False):
         """
-        Climate forcing can be easily enforced in IGM by customizing this function to your needs, e.g., building fields of temperature and precipitation, which can be used by an accumulation/melt model (PDD-like) model. Check at the aletsch-1880-21000 example.
+        This function serves to define a climate forcing (e.g. monthly temperature and precipitation fields) to be used for the surface mass balance model (e.g. accumulation/melt PDD-like model). No climate forcing is provided with IGM is this is case-dependent. Check at the aletsch-1880-21000 example.
         """
 
         if len(self.config.type_climate) > 0:
