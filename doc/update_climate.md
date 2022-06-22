@@ -6,9 +6,7 @@
 Help on method update_climate in module igm:
 
 update_climate(force=False) method of igm.Igm instance
-    Climate forcing can be easily enforced in IGM by customizing this function to your needs, 
-    e.g., building fields of temperature and precipitation, which can be used by an accumulation/melt model 
-    (PDD-like) model. Check at the aletsch-1880-21000 example.
+    Climate forcing can be easily enforced in IGM by customizing this function to your needs, e.g., building fields of temperature and precipitation, which can be used by an accumulation/melt model (PDD-like) model. Check at the aletsch-1880-21000 example.
 
 
 
@@ -37,9 +35,7 @@ optional arguments:
 
     def update_climate(self, force=False):
         """
-        Climate forcing can be easily enforced in IGM by customizing this function to your needs, 
-        e.g., building fields of temperature and precipitation, which can be used by an accumulation/melt model 
-        (PDD-like) model. Check at the aletsch-1880-21000 example.
+        Climate forcing can be easily enforced in IGM by customizing this function to your needs, e.g., building fields of temperature and precipitation, which can be used by an accumulation/melt model (PDD-like) model. Check at the aletsch-1880-21000 example.
         """
 
         if len(self.config.type_climate) > 0:
