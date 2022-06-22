@@ -13,6 +13,8 @@ update_plot(force=False) method of igm.Igm instance
 ### <h1 align="center" id="title"> Parameters of update_plot </h1>
 
 
+``` 
+
 usage: [-h] [--varplot VARPLOT] [--varplot_max VARPLOT_MAX]
 
 optional arguments:
@@ -21,6 +23,8 @@ optional arguments:
   --varplot_max VARPLOT_MAX
                         maximum value of the varplot variable used to adjust
                         the scaling of the colorbar
+``` 
+
 
 
 ### <h1 align="center" id="title"> Code of update_plot </h1>

@@ -19,6 +19,8 @@ optimize() method of igm.Igm instance
 ### <h1 align="center" id="title"> Parameters of optimize </h1>
 
 
+``` 
+
 usage:  [-h] [--opti_vars_to_save OPTI_VARS_TO_SAVE]
         [--observation_file OBSERVATION_FILE]
         [--thk_profiles_file THK_PROFILES_FILE] [--mode_opti MODE_OPTI]
@@ -100,6 +102,8 @@ optional arguments:
                         Frequency of the output for the optimization
   --geology_optimized_file GEOLOGY_OPTIMIZED_FILE
                         Geology input file
+``` 
+
 
 
 ### <h1 align="center" id="title"> Code of optimize </h1>

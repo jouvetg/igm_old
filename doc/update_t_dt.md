@@ -13,12 +13,16 @@ update_t_dt() method of igm.Igm instance
 ### <h1 align="center" id="title"> Parameters of update_t_dt </h1>
 
 
+``` 
+
 usage: [-h] [--cfl CFL] [--dtmax DTMAX]
 
 optional arguments:
   -h, --help     show this help message and exit
   --cfl CFL      CFL number must be below 1 (0.3)
   --dtmax DTMAX  Maximum time step, used only with slow ice (10.0)
+``` 
+
 
 
 ### <h1 align="center" id="title"> Code of update_t_dt </h1>

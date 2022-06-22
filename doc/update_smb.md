@@ -13,6 +13,8 @@ update_smb(force=False) method of igm.Igm instance
 ### <h1 align="center" id="title"> Parameters of update_smb </h1>
 
 
+``` 
+
 usage:  [-h] [--mb_update_freq MB_UPDATE_FREQ]
         [--type_mass_balance TYPE_MASS_BALANCE] [--mb_scaling MB_SCALING]
         [--mb_simple_file MB_SIMPLE_FILE]
@@ -31,6 +33,8 @@ optional arguments:
   --smb_model_lib_path SMB_MODEL_LIB_PATH
                         Model directory in case the smb model in use is
                         'nn'for neural netowrk
+``` 
+
 
 
 ### <h1 align="center" id="title"> Code of update_smb </h1>

@@ -13,6 +13,8 @@ update_climate(force=False) method of igm.Igm instance
 ### <h1 align="center" id="title"> Parameters of update_climate </h1>
 
 
+``` 
+
 usage:  [-h] [--clim_update_freq CLIM_UPDATE_FREQ]
         [--type_climate TYPE_CLIMATE]
 
@@ -22,6 +24,8 @@ optional arguments:
                         Update the climate each X years (1)
   --type_climate TYPE_CLIMATE
                         toy or any custom climate
+``` 
+
 
 
 ### <h1 align="center" id="title"> Code of update_climate </h1>

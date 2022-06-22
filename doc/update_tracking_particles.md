@@ -14,6 +14,8 @@ update_tracking_particles() method of igm.Igm instance
 ### <h1 align="center" id="title"> Parameters of update_tracking_particles </h1>
 
 
+``` 
+
 usage:  [-h] [--tracking_particles TRACKING_PARTICLES]
         [--frequency_seeding FREQUENCY_SEEDING]
         [--density_seeding DENSITY_SEEDING]
@@ -26,6 +28,8 @@ optional arguments:
                         Update frequency of tracking
   --density_seeding DENSITY_SEEDING
                         density_seeding
+``` 
+
 
 
 ### <h1 align="center" id="title"> Code of update_tracking_particles </h1>

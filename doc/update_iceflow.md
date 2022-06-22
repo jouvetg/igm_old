@@ -13,6 +13,8 @@ update_iceflow() method of igm.Igm instance
 ### <h1 align="center" id="title"> Parameters of update_iceflow </h1>
 
 
+``` 
+
 usage:  [-h] [--iceflow_model_lib_path ICEFLOW_MODEL_LIB_PATH]
         [--multiple_window_size MULTIPLE_WINDOW_SIZE]
         [--force_max_velbar FORCE_MAX_VELBAR]
@@ -27,6 +29,8 @@ optional arguments:
   --force_max_velbar FORCE_MAX_VELBAR
                         This permits to artificially upper-bound velocities,
                         active if > 0
+``` 
+
 
 
 ### <h1 align="center" id="title"> Code of update_iceflow </h1>

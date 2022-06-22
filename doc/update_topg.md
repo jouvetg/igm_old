@@ -15,6 +15,8 @@ update_topg() method of igm.Igm instance
 ### <h1 align="center" id="title"> Parameters of update_topg </h1>
 
 
+``` 
+
 usage:  [-h] [--erosion_include EROSION_INCLUDE] [--erosion_cst EROSION_CST]
         [--erosion_exp EROSION_EXP]
         [--erosion_update_freq EROSION_UPDATE_FREQ]
@@ -39,6 +41,8 @@ optional arguments:
                         unit is m/y
   --uplift_update_freq UPLIFT_UPDATE_FREQ
                         Update the uplift only each 100 years
+``` 
+
 
 
 ### <h1 align="center" id="title"> Code of update_topg </h1>
