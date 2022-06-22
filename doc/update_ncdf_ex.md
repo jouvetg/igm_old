@@ -6,7 +6,7 @@
 Help on method update_ncdf_ex in module igm:
 
 update_ncdf_ex(force=False) method of igm.Igm instance
-    Initialize  and write the ncdf output file
+Initialize  and write the ncdf output file
 
 
 

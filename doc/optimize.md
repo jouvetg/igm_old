@@ -6,13 +6,13 @@
 Help on method optimize in module igm:
 
 optimize() method of igm.Igm instance
-    This is the optimization routine to invert thk, strflowctrl ans usurf from data
-    DEFAULT PARAMETERS ARE
-    # nbitmin=50, nbitmax=1000, opti_step_size=0.001,
-    # init_zero_thk=True,
-    # regu_param_thk=1.0, regu_param_strflowctrl=1.0,
-    # smooth_anisotropy_factor=0.2, convexity_weight = 0.002,
-    # opti_control=['thk','strflowctrl'], opti_cost=['velsurf','thk'],
+This is the optimization routine to invert thk, strflowctrl ans usurf from data
+DEFAULT PARAMETERS ARE
+# nbitmin=50, nbitmax=1000, opti_step_size=0.001,
+# init_zero_thk=True,
+# regu_param_thk=1.0, regu_param_strflowctrl=1.0,
+# smooth_anisotropy_factor=0.2, convexity_weight = 0.002,
+# opti_control=['thk','strflowctrl'], opti_cost=['velsurf','thk'],
 
 
 
