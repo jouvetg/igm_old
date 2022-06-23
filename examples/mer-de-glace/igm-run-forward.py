@@ -15,11 +15,7 @@ class Igm(Igm):
             mass balance 'mysmb'
         """
 
-        if self.t<1880:
-           ela = self.ELA + 0  # Take today's ELA + 50 before 1800
-        else:
-           ela = self.ELA + 25  # Take today's ELA + 100 after 1800
-
+        ela = self.ELA
         smb = (self.usurf - ela)*self.gradmb
         smb = tf.where(self.icemask>0.5, smb, -10 )
         self.smb.assign( smb )
@@ -32,17 +28,17 @@ glacier.ELA    = 2900
 glacier.gradmb = 0.003
 
 glacier.config.working_dir              = '' 
-glacier.config.iceflow_model_lib_path   = '../../model-lib/f17_pismbp_GJ_22_a/'  
+glacier.config.iceflow_model_lib_path   = '../../model-lib/f15_cfsflow_GJ_22_a/'  
 glacier.config.geology_file             = 'geology.nc' # this time we take the (shortly) optimized geology data
 
 glacier.config.tstart            = 1700    # our data (glacier surface DEM, speeds) are about from that year
 glacier.config.tend              = 2020    # we run the model until 2100
-glacier.config.tsave             = 2       # we save output each 2 years
+glacier.config.tsave             = 5       # we save output each 2 years
 glacier.config.cfl               = 0.15    # the CFL number determines the time step, it should be < 1, reduce it further if unstability occurs.
 glacier.config.type_mass_balance = 'mysmb' # we have to select the SMB defined before.
 
-glacier.config.plot_result           = True
-glacier.config.plot_live             = True
+glacier.config.plot_result           = False
+glacier.config.plot_live             = False
 
 glacier.config.varplot_max           = 250 
 
@@ -61,7 +57,7 @@ with tf.device(glacier.device_name):
         glacier.update_smb()
         glacier.update_iceflow()
         if glacier.config.tracking_particles:
-             igm.update_tracking_particles()
+             glacier.update_tracking_particles()
         glacier.update_t_dt() 
         glacier.update_thk()       
         glacier.update_ncdf_ex()

@@ -12,17 +12,17 @@ glacier=Igm()
 
 # define working directory and input files
 glacier.config.working_dir            = ''                     
-glacier.config.iceflow_model_lib_path = '../../model-lib/f17_pismbp_GJ_22_a/' 
-glacier.config.observation_file       = 'observation-RGI-3642.nc' # this is the main input file
-glacier.config.plot_result           = False
-glacier.config.plot_live             = False
+glacier.config.iceflow_model_lib_path = '../../model-lib/f15_cfsflow_GJ_22_a/' 
+glacier.config.observation_file       = 'observation.nc' # this is the main input file
+glacier.config.plot_result           = True
+glacier.config.plot_live             = True
  
 glacier.config.opti_output_freq       =  50     # Frequency for output
-glacier.config.opti_nbitmax           = 500     # Number of iterations for the optimization
+glacier.config.opti_nbitmax           = 300     # Number of iterations for the optimization
 glacier.config.thk_profiles_file      = ''     
 
 glacier.config.opti_usurfobs_std             = 2.0   # Tol to fit top ice surface
-glacier.config.opti_velsurfobs_std           = 3.0   # Tol to fit surface speeds
+glacier.config.opti_velsurfobs_std           = 2.0   # Tol to fit surface speeds
 glacier.config.opti_thkobs_std               = 5.0   # Tol to fit ice thk profiles
 glacier.config.opti_strflowctrl_std          = 5.0   # Tol to fit strflowctr
 glacier.config.opti_divfluxobs_std           = 0.5   # Tol to fit the flux divergence (NON DEFAULT)
