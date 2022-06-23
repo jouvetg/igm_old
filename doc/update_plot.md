@@ -19,8 +19,7 @@ optional arguments:
   -h, --help            show this help message and exit
   --varplot VARPLOT     variable to plot
   --varplot_max VARPLOT_MAX
-                        maximum value of the varplot variable used to adjust the scaling of the
-                        colorbar
+                        maximum value of the varplot variable used to adjust the scaling of the colorbar
 ``` 
 
 

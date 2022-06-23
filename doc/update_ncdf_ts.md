@@ -4,7 +4,7 @@
 
 
 
-Initialize  and write the ncdf time serie file
+This function write time serie variables (ice glaziated area and volume) into the ncdf output file ts.nc
 
 
 
@@ -15,7 +15,7 @@ Initialize  and write the ncdf time serie file
 
     def update_ncdf_ts(self, force=False):
         """
-        Initialize  and write the ncdf time serie file
+        This function write time serie variables (ice glaziated area and volume) into the ncdf output file ts.nc
         """
 
         if not hasattr(self, "already_called_update_ncdf_ts"):

@@ -4,7 +4,7 @@
 
 
 
-IGM can use several surface mass balance models:
+This function permits to choose between several surface mass balance models:
 
 * A very simple mass balance model based on a few parameters (ELA, ...), whose parameters are defined in file glacier.config.mb_simple_file. This surface mass balance is provided with IGM.
 
@@ -19,9 +19,7 @@ IGM can use several surface mass balance models:
 
 ``` 
 
-usage: make-doc-function-md.py [-h] [--mb_update_freq MB_UPDATE_FREQ]
-                               [--type_mass_balance TYPE_MASS_BALANCE] [--mb_scaling MB_SCALING]
-                               [--mb_simple_file MB_SIMPLE_FILE]
+usage: make-doc-function-md.py [-h] [--mb_update_freq MB_UPDATE_FREQ] [--type_mass_balance TYPE_MASS_BALANCE] [--mb_scaling MB_SCALING] [--mb_simple_file MB_SIMPLE_FILE]
                                [--smb_model_lib_path SMB_MODEL_LIB_PATH]
 
 optional arguments:
@@ -29,13 +27,13 @@ optional arguments:
   --mb_update_freq MB_UPDATE_FREQ
                         Update the mass balance each X years (1)
   --type_mass_balance TYPE_MASS_BALANCE
-                        zero, simple, given
+                        This keywork permits to identify the type of mass balance model, can be: zero, simple, nn or given (Default: simple)
   --mb_scaling MB_SCALING
-                        mass balance scaling
+                        The paramter permit to make a simple mass balance scaling
   --mb_simple_file MB_SIMPLE_FILE
-                        mb_simple_file
+                        Name of the imput file for the simple mass balance model
   --smb_model_lib_path SMB_MODEL_LIB_PATH
-                        Model directory in case the smb model in use is 'nn'for neural netowrk
+                        Model directory in case the smb model in use is 'nn', i.e. neural network
 ``` 
 
 
@@ -47,7 +45,7 @@ optional arguments:
 
     def update_smb(self, force=False):
         """
-        IGM can use several surface mass balance models:
+        This function permits to choose between several surface mass balance models:
                 
         * A very simple mass balance model based on a few parameters (ELA, ...), whose parameters are defined in file glacier.config.mb_simple_file. This surface mass balance is provided with IGM.
                 

@@ -4,7 +4,7 @@
 
 
 
-Initialize  and write the ncdf output file
+This function write 2D field variables defined in the list config.vars_to_save into the ncdf output file ex.nc
 
 
 
@@ -18,7 +18,7 @@ usage: make-doc-function-md.py [-h] [--vars_to_save VARS_TO_SAVE]
 optional arguments:
   -h, --help            show this help message and exit
   --vars_to_save VARS_TO_SAVE
-                        List of variables to be recorded in the ncdef file
+                        List of variables to be recorded in the ncdf file
 ``` 
 
 
@@ -30,7 +30,7 @@ optional arguments:
 
     def update_ncdf_ex(self, force=False):
         """
-        Initialize  and write the ncdf output file
+        This function write 2D field variables defined in the list config.vars_to_save into the ncdf output file ex.nc
         """
 
         if not hasattr(self, "already_called_update_ncdf_ex"):
