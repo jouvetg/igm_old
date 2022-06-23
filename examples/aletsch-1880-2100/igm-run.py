@@ -13,7 +13,7 @@ import time
 from igm import Igm
 from igm_clim_aletsch import *
 from igm_smb_accmelt import *
- 
+
 # add extensions for climate generation and mass balance to the core igm class
 class Igm(Igm,Igm_clim_aletsch, Igm_smb_accmelt):
     pass
@@ -36,7 +36,7 @@ glacier = Igm()
 # change parameters
 glacier.config.working_dir           = ''
 glacier.config.tstart                = 1880
-glacier.config.tend                  = 2100
+glacier.config.tend                  = 2020
 glacier.config.tsave                 = 1
 glacier.config.cfl                   = 0.25
 
@@ -71,7 +71,7 @@ glacier.config.weight_Ewigschneefeld = 1.0
 
 # This permits to compute particle trajectories
 glacier.config.tracking_particles      = False  # activate particle tracking
-glacier.config.frequency_seeding       = 10    # we seed every 10 years
+glacier.config.frequency_seeding       = 5    # we seed every 10 years
 glacier.config.density_seeding         = 0.2   # we seed each 5 point of the 2D grid
 
 # From now, we could have call glacier.run(), but we instead give all steps to embed some 
