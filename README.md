@@ -4,7 +4,7 @@
 
 # Notice 
 
-IGM is a very young code, which has been shortly distributed after the publication of our [paper](https://www.doi.org/10.1017/jog.2021.120) in Journal of Glaciology. More features will come in the next months (e.g., data assimilation). IGM is in a preliminary phase, which aims to illustrate its capacities with simple examples and get feedback from the community. If you have ideas of extensions or applications, you would like to contribute, please contact me at guillaume.jouvet at unil.ch.
+IGM is a very young model, continuously developped, with limited documentation and testing. To start with, I recomand to start with examples (via colab notebooks or the example folder). If you have ideas of extensions or applications, you would like to contribute, please contact me at guillaume.jouvet at unil.ch.
 
 # Overview   
 
