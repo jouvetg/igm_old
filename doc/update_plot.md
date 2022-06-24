@@ -19,7 +19,8 @@ optional arguments:
   -h, --help            show this help message and exit
   --varplot VARPLOT     variable to plot
   --varplot_max VARPLOT_MAX
-                        maximum value of the varplot variable used to adjust the scaling of the colorbar
+                        maximum value of the varplot variable used to adjust the scaling of the
+                        colorbar
 ``` 
 
 
@@ -35,6 +36,8 @@ optional arguments:
         """
 
         if force | (self.saveresult & self.config.plot_result):
+            
+            self.extent = [np.min(self.x),np.max(self.x),np.min(self.y),np.max(self.y)]
 
             firstime = False
             if not hasattr(self, "already_called_update_plot"):
@@ -58,12 +61,13 @@ optional arguments:
                     cmap="viridis",
                     vmin=0,
                     vmax=self.config.varplot_max,
+                    extent=self.extent
                 )
                 if self.config.tracking_particles:
                     r = 1
                     self.ip = self.ax.scatter(
-                        x=(self.xpos[::r] - self.x[0]) / self.dx,
-                        y=(self.ypos[::r] - self.y[0]) / self.dx,
+                        x=self.xpos[::r],
+                        y=self.ypos[::r],
                         c=1 - self.rhpos[::r].numpy(),
                         vmin=0,
                         vmax=1,
@@ -72,7 +76,8 @@ optional arguments:
                     )
                 self.ax.set_title("YEAR : " + str(self.t.numpy()), size=15)
                 self.cbar = plt.colorbar(im)
-
+                # self.ax.set_xlim(427500, 430000)
+                # self.ax.set_ylim(5142250,5147050)
             else:
                 im = self.ax.imshow(
                     vars(self)[self.config.varplot],
@@ -80,13 +85,14 @@ optional arguments:
                     cmap="viridis",
                     vmin=0,
                     vmax=self.config.varplot_max,
+                    extent=self.extent
                 )
                 if self.config.tracking_particles:
                     self.ip.set_visible(False)
                     r = 1
                     self.ip = self.ax.scatter(
-                        x=(self.xpos[::r] - self.x[0]) / self.dx,
-                        y=(self.ypos[::r] - self.y[0]) / self.dx,
+                        x=self.xpos[::r],
+                        y=self.ypos[::r],
                         c=1 - self.rhpos[::r].numpy(),
                         vmin=0,
                         vmax=1,

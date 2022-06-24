@@ -19,7 +19,9 @@ This function permits to choose between several surface mass balance models:
 
 ``` 
 
-usage: make-doc-function-md.py [-h] [--mb_update_freq MB_UPDATE_FREQ] [--type_mass_balance TYPE_MASS_BALANCE] [--mb_scaling MB_SCALING] [--mb_simple_file MB_SIMPLE_FILE]
+usage: make-doc-function-md.py [-h] [--mb_update_freq MB_UPDATE_FREQ]
+                               [--type_mass_balance TYPE_MASS_BALANCE] [--mb_scaling MB_SCALING]
+                               [--mb_simple_file MB_SIMPLE_FILE]
                                [--smb_model_lib_path SMB_MODEL_LIB_PATH]
 
 optional arguments:
@@ -27,7 +29,8 @@ optional arguments:
   --mb_update_freq MB_UPDATE_FREQ
                         Update the mass balance each X years (1)
   --type_mass_balance TYPE_MASS_BALANCE
-                        This keywork permits to identify the type of mass balance model, can be: zero, simple, nn or given (Default: simple)
+                        This keywork permits to identify the type of mass balance model, can be:
+                        zero, simple, nn or given (Default: simple)
   --mb_scaling MB_SCALING
                         The paramter permit to make a simple mass balance scaling
   --mb_simple_file MB_SIMPLE_FILE

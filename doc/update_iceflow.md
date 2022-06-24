@@ -23,16 +23,20 @@ For now, only the emulator trained by CfsFlow and PISM is available with differe
 
 ``` 
 
-usage: make-doc-function-md.py [-h] [--iceflow_model_lib_path ICEFLOW_MODEL_LIB_PATH] [--multiple_window_size MULTIPLE_WINDOW_SIZE] [--force_max_velbar FORCE_MAX_VELBAR]
+usage: make-doc-function-md.py [-h] [--iceflow_model_lib_path ICEFLOW_MODEL_LIB_PATH]
+                               [--multiple_window_size MULTIPLE_WINDOW_SIZE]
+                               [--force_max_velbar FORCE_MAX_VELBAR]
 
 optional arguments:
   -h, --help            show this help message and exit
   --iceflow_model_lib_path ICEFLOW_MODEL_LIB_PATH
                         Directory path of the deep-learning ice flow model
   --multiple_window_size MULTIPLE_WINDOW_SIZE
-                        In case the ANN is a U-net, it must force window size to be multiple of e.g. 8 (default: 0)
+                        In case the ANN is a U-net, it must force window size to be multiple of
+                        e.g. 8 (default: 0)
   --force_max_velbar FORCE_MAX_VELBAR
-                        This permits to artificially upper-bound velocities, active if > 0 (default: 0)
+                        This permits to artificially upper-bound velocities, active if > 0
+                        (default: 0)
 ``` 
 
 

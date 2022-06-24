@@ -13,14 +13,16 @@ This function serves to define a climate forcing (e.g. monthly temperature and p
 
 ``` 
 
-usage: make-doc-function-md.py [-h] [--clim_update_freq CLIM_UPDATE_FREQ] [--type_climate TYPE_CLIMATE]
+usage: make-doc-function-md.py [-h] [--clim_update_freq CLIM_UPDATE_FREQ]
+                               [--type_climate TYPE_CLIMATE]
 
 optional arguments:
   -h, --help            show this help message and exit
   --clim_update_freq CLIM_UPDATE_FREQ
                         Update the climate each X years (default: 1)
   --type_climate TYPE_CLIMATE
-                        This keywork serves to identify & call the climate forcing. If an empty string, this function is not called (Default: )
+                        This keywork serves to identify & call the climate forcing. If an empty
+                        string, this function is not called (Default: )
 ``` 
 
 

@@ -13,17 +13,22 @@ This function implements change in basal topography (glacial erosion or uplift).
 
 ``` 
 
-usage: make-doc-function-md.py [-h] [--erosion_include EROSION_INCLUDE] [--erosion_cst EROSION_CST] [--erosion_exp EROSION_EXP] [--erosion_update_freq EROSION_UPDATE_FREQ]
-                               [--uplift_include UPLIFT_INCLUDE] [--uplift_rate UPLIFT_RATE] [--uplift_update_freq UPLIFT_UPDATE_FREQ]
+usage: make-doc-function-md.py [-h] [--erosion_include EROSION_INCLUDE] [--erosion_cst EROSION_CST]
+                               [--erosion_exp EROSION_EXP]
+                               [--erosion_update_freq EROSION_UPDATE_FREQ]
+                               [--uplift_include UPLIFT_INCLUDE] [--uplift_rate UPLIFT_RATE]
+                               [--uplift_update_freq UPLIFT_UPDATE_FREQ]
 
 optional arguments:
   -h, --help            show this help message and exit
   --erosion_include EROSION_INCLUDE
                         Include a model for bedrock erosion (Default: False)
   --erosion_cst EROSION_CST
-                        Erosion multiplicative factor, here taken from Herman, F. et al. Erosion by an Alpine glacier. Science 350, 193–195 (2015)
+                        Erosion multiplicative factor, here taken from Herman, F. et al. Erosion by
+                        an Alpine glacier. Science 350, 193–195 (2015)
   --erosion_exp EROSION_EXP
-                        Erosion exponent factor, here taken from Herman, F. et al. Erosion by an Alpine glacier. Science 350, 193–195 (2015)
+                        Erosion exponent factor, here taken from Herman, F. et al. Erosion by an
+                        Alpine glacier. Science 350, 193–195 (2015)
   --erosion_update_freq EROSION_UPDATE_FREQ
                         Update the erosion only each X years (Default: 100)
   --uplift_include UPLIFT_INCLUDE

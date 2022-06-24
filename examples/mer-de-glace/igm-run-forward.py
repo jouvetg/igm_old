@@ -57,7 +57,7 @@ with tf.device(glacier.device_name):
         glacier.update_smb()
         glacier.update_iceflow()
         if glacier.config.tracking_particles:
-             glacier.update_tracking_particles()
+             glacier.update_particles()
         glacier.update_t_dt() 
         glacier.update_thk()       
         glacier.update_ncdf_ex()
