@@ -1303,7 +1303,7 @@ class Igm:
         self.nrhpos = tf.ones_like(self.X[I])
         self.nwpos = tf.ones_like(self.X[I])
 
-    def update_tracking_particles(self):
+    def update_particles(self):
         """
         IGM includes a particle tracking routine, which can compute a large number of trajectories (as it is implemented with TensorFlow to run in parallel) in live time during the forward model run. The routine produces some seeding of particles (by default in the accumulation area at regular intervals), and computes the time trajectory of the resulting particle in time advected by the velocity field in 3D. Horizontal and vertical directions are treated differently:
         
@@ -3552,7 +3552,7 @@ class Igm:
                 self.update_iceflow()
 
                 if self.config.tracking_particles:
-                    self.update_tracking_particles()
+                    self.update_particles()
 
                 self.update_t_dt()
 
