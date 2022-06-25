@@ -26,5 +26,6 @@ The easiest and quickest way is to get to know IGM is to run notebooks in [![Col
 
 # Contact
 
+
 Feel free to drop me an email for any questions, bug reports, or ideas of model extension: guillaume.jouvet at unil.ch
 
