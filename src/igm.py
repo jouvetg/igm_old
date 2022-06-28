@@ -1253,9 +1253,16 @@ class Igm:
 
         self.parser.add_argument(
             "--tracking_particles",
-            type=int,
+            type=bool,
             default=False,
             help="Is the particle tracking active? (Default: False)",
+        )
+
+        self.parser.add_argument(
+            "--tracking_method",
+            type=str,
+            default='simple',
+            help="Method for tracking particles",
         )
 
         self.parser.add_argument(
@@ -1300,6 +1307,7 @@ class Igm:
         I = (self.thk > 10) & (self.smb > -2) & self.gridseed
         self.nxpos = self.X[I]
         self.nypos = self.Y[I]
+        self.nzpos = self.usurf[I]
         self.nrhpos = tf.ones_like(self.X[I])
         self.nwpos = tf.ones_like(self.X[I])
 
@@ -1326,6 +1334,8 @@ class Igm:
         Check at the example aletsch-1880-2100 for an example of particle tracking.
         """
 
+        import tensorflow_addons as tfa
+
         if self.config.verbosity == 1:
             print("Update TRACKING at time : ", self.t)
 
@@ -1337,6 +1347,7 @@ class Igm:
             # initialize trajectories
             self.xpos = tf.Variable([])
             self.ypos = tf.Variable([])
+            self.zpos = tf.Variable([])
             self.rhpos = tf.Variable([])
             self.wpos = tf.Variable([])
 
@@ -1360,6 +1371,7 @@ class Igm:
                 # merge the new seeding points with the former ones
                 self.xpos = tf.Variable(tf.concat([self.xpos, self.nxpos], axis=-1))
                 self.ypos = tf.Variable(tf.concat([self.ypos, self.nypos], axis=-1))
+                self.zpos = tf.Variable(tf.concat([self.zpos, self.nzpos], axis=-1))
                 self.rhpos = tf.Variable(tf.concat([self.rhpos, self.nrhpos], axis=-1))
                 self.wpos = tf.Variable(tf.concat([self.wpos, self.nwpos], axis=-1))
 
@@ -1379,8 +1391,6 @@ class Igm:
                 ),
                 axis=0,
             )
-
-            import tensorflow_addons as tfa
 
             uvelbase = tfa.image.interpolate_bilinear(
                 tf.expand_dims(tf.expand_dims(self.uvelbase, axis=0), axis=-1),
@@ -1411,37 +1421,127 @@ class Igm:
                 indices,
                 indexing="ij",
             )[0, :, 0]
-
+            
+            topg = tfa.image.interpolate_bilinear(
+                tf.expand_dims(tf.expand_dims(self.topg, axis=0), axis=-1),
+                indices,
+                indexing="ij",
+            )[0, :, 0]
+             
             smb = tfa.image.interpolate_bilinear(
                 tf.expand_dims(tf.expand_dims(self.smb, axis=0), axis=-1),
                 indices,
                 indexing="ij",
             )[0, :, 0]
+            
+            if self.config.tracking_method=='simple':
 
-            nthk = othk + smb * self.dt  # new ice thicnkess after smb update
-
-            # adjust the relative height within the ice column with smb
-            self.rhpos.assign(
-                tf.where(
-                    nthk > 0.1, tf.clip_by_value(self.rhpos * othk / nthk, 0, 1), 1
+                nthk = othk + smb * self.dt  # new ice thicnkess after smb update
+    
+                # adjust the relative height within the ice column with smb
+                self.rhpos.assign(
+                    tf.where(
+                        nthk > 0.1, tf.clip_by_value(self.rhpos * othk / nthk, 0, 1), 1
+                    )
                 )
-            )
+                
+                uvel = uvelbase + (uvelsurf - uvelbase) * (
+                    1 - (1 - self.rhpos) ** 4
+                )  # SIA-like
+                vvel = vvelbase + (vvelsurf - vvelbase) * (
+                    1 - (1 - self.rhpos) ** 4
+                )  # SIA-like
+    
+                self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
+                self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler 
+                
+                self.zpos.assign( topg + nthk * self.rhpos  )
+                
+            elif self.config.tracking_method=='3d':
+                
+                slopsurfx, slopsurfy = self.compute_gradient_tf(self.usurf, self.dx, self.dx)
+                sloptopgx, sloptopgy = self.compute_gradient_tf(self.topg, self.dx, self.dx)
+        
+                self.divflux = self.compute_divflux(self.ubar, self.vbar, self.thk, self.dx, self.dx)
+        
+                self.wvelbase =                 self.uvelbase * sloptopgx + self.vvelbase * sloptopgy
+                self.wvelsurf = -self.divflux + self.uvelsurf * slopsurfx + self.vvelsurf * slopsurfy
+                
+                wvelbase = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.wvelbase, axis=0), axis=-1),
+                    indices,
+                    indexing="ij",
+                )[0, :, 0]
+                
+                wvelsurf = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.wvelsurf, axis=0), axis=-1),
+                    indices,
+                    indexing="ij",
+                )[0, :, 0]
 
-            uvel = uvelbase + (uvelsurf - uvelbase) * (
-                1 - (1 - self.rhpos) ** 4
-            )  # SIA-like
-            vvel = vvelbase + (vvelsurf - vvelbase) * (
-                1 - (1 - self.rhpos) ** 4
-            )  # SIA-like
+                self.zpos.assign( tf.clip_by_value( self.zpos , topg, topg+othk) )
+                
+                self.rhpos.assign( tf.where( othk > 0.1, (self.zpos - topg)/othk , 1 ) )
+                 
+                uvel = uvelbase + (uvelsurf - uvelbase) * ( 1 - (1 - self.rhpos) ** 4)
+                vvel = vvelbase + (vvelsurf - vvelbase) * ( 1 - (1 - self.rhpos) ** 4)
+                wvel = wvelbase + (wvelsurf - wvelbase) * ( 1 - (1 - self.rhpos) ** 4)
+                   
+                self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
+                self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler 
+                self.zpos.assign(self.zpos + self.dt * wvel)  # forward euler 
+                
+            # elif self.config.tracking_method==2:
+                 
+            #     self.divbase = self.compute_div(self.uvelbase, self.vvelbase, self.dx, self.dx) 
+            #     self.divsurf = self.compute_div(self.uvelsurf, self.vvelsurf, self.dx, self.dx) 
+                 
+            #     divbase = tfa.image.interpolate_bilinear(
+            #         tf.expand_dims(tf.expand_dims(self.divbase, axis=0), axis=-1),
+            #         indices,
+            #         indexing="ij",
+            #     )[0, :, 0]
+                 
+            #     divsurf = tfa.image.interpolate_bilinear(
+            #         tf.expand_dims(tf.expand_dims(self.divsurf, axis=0), axis=-1),
+            #         indices,
+            #         indexing="ij",
+            #     )[0, :, 0]
+                
+            #     divflux = tfa.image.interpolate_bilinear(
+            #         tf.expand_dims(tf.expand_dims(self.divflux, axis=0), axis=-1),
+            #         indices,
+            #         indexing="ij",
+            #     )[0, :, 0]
+                
+            #     topg = tfa.image.interpolate_bilinear(
+            #         tf.expand_dims(tf.expand_dims(self.topg, axis=0), axis=-1),
+            #         indices,
+            #         indexing="ij",
+            #     )[0, :, 0]
+                
+            #     usurf = tfa.image.interpolate_bilinear(
+            #         tf.expand_dims(tf.expand_dims(self.usurf, axis=0), axis=-1),
+            #         indices,
+            #         indexing="ij",
+            #     )[0, :, 0]
+                
+            #     uvel = uvelbase + (uvelsurf - uvelbase) * ( 1 - (1 - self.rhpos) ** 4)
+            #     vvel = vvelbase + (vvelsurf - vvelbase) * ( 1 - (1 - self.rhpos) ** 4)
+            #     div  = divbase  + (divsurf - divbase) * self.rhpos
+                
+            #     nthk = tf.maximum( othk + self.dt * (smb - divflux), 0) 
+                  
+            #     z = (1 - self.rhpos) * othk
+                 
+            #     self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
+            #     self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler
 
-            self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
-            self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler
-
-            # THIS WAS IMPLMENTED BY MISTAKE BEFORE; WE NO LONGER USE THE VERTICAL VELOCITY
-            # adjust the relative height within the ice column with the verticial velocity
-            # self.rhpos.assign(tf.where(nthk>0.1,
-            #                             tf.clip_by_value((self.rhpos*nthk+self.dt*wvel)/nthk,0,1),
-            #                             1))
+            #     z  = z + self.dt * ( self.rhpos * smb - z * div )
+                
+            #     self.rhpos.assign(
+            #         tf.clip_by_value( tf.where( nthk > 0.1, 1 - (z/nthk), 1 ) , 0 , 1 )
+            #     ) 
 
             indices = tf.concat(
                 [

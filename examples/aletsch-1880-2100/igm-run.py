@@ -27,6 +27,7 @@ class Igm(Igm):
         I = (self.thk>1)&(self.seeding>0.5)&self.gridseed  # here you may redefine how you want to seed particles
         self.nxpos  = self.X[I]                # x position of the particle
         self.nypos  = self.Y[I]                # y position of the particle
+        self.nzpos  = self.usurf[I]            # z position of the particle
         self.nrhpos = tf.ones_like(self.X[I])  # relative position in the ice column
         self.nwpos  = tf.ones_like(self.X[I])  # this is the weight of the particle
 
@@ -70,6 +71,7 @@ glacier.config.weight_Jungfraufirn   = 1.0
 glacier.config.weight_Ewigschneefeld = 1.0
 
 # This permits to compute particle trajectories
+glacier.config.tracking_method         = '3d'
 glacier.config.tracking_particles      = False  # activate particle tracking
 glacier.config.frequency_seeding       = 5    # we seed every 10 years
 glacier.config.density_seeding         = 0.2   # we seed each 5 point of the 2D grid
