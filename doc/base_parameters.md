@@ -50,6 +50,7 @@ usage: make-doc-function-md.py [-h] [--working_dir WORKING_DIR] [--geology_file 
                                [--mb_simple_file MB_SIMPLE_FILE]
                                [--smb_model_lib_path SMB_MODEL_LIB_PATH] [--cfl CFL]
                                [--dtmax DTMAX] [--tracking_particles TRACKING_PARTICLES]
+                               [--tracking_method TRACKING_METHOD]
                                [--frequency_seeding FREQUENCY_SEEDING]
                                [--density_seeding DENSITY_SEEDING]
 
@@ -187,6 +188,8 @@ optional arguments:
   --dtmax DTMAX         Maximum time step allowed, used only with slow ice (default: 10.0)
   --tracking_particles TRACKING_PARTICLES
                         Is the particle tracking active? (Default: False)
+  --tracking_method TRACKING_METHOD
+                        Method for tracking particles
   --frequency_seeding FREQUENCY_SEEDING
                         Frequency of seeding (default: 10)
   --density_seeding DENSITY_SEEDING
