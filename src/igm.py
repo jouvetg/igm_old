@@ -1261,7 +1261,7 @@ class Igm:
         self.parser.add_argument(
             "--tracking_method",
             type=str,
-            default='simple',
+            default='3d',
             help="Method for tracking particles",
         )
 
@@ -1491,57 +1491,8 @@ class Igm:
                 self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler 
                 self.zpos.assign(self.zpos + self.dt * wvel)  # forward euler 
                 
-            # elif self.config.tracking_method==2:
-                 
-            #     self.divbase = self.compute_div(self.uvelbase, self.vvelbase, self.dx, self.dx) 
-            #     self.divsurf = self.compute_div(self.uvelsurf, self.vvelsurf, self.dx, self.dx) 
-                 
-            #     divbase = tfa.image.interpolate_bilinear(
-            #         tf.expand_dims(tf.expand_dims(self.divbase, axis=0), axis=-1),
-            #         indices,
-            #         indexing="ij",
-            #     )[0, :, 0]
-                 
-            #     divsurf = tfa.image.interpolate_bilinear(
-            #         tf.expand_dims(tf.expand_dims(self.divsurf, axis=0), axis=-1),
-            #         indices,
-            #         indexing="ij",
-            #     )[0, :, 0]
-                
-            #     divflux = tfa.image.interpolate_bilinear(
-            #         tf.expand_dims(tf.expand_dims(self.divflux, axis=0), axis=-1),
-            #         indices,
-            #         indexing="ij",
-            #     )[0, :, 0]
-                
-            #     topg = tfa.image.interpolate_bilinear(
-            #         tf.expand_dims(tf.expand_dims(self.topg, axis=0), axis=-1),
-            #         indices,
-            #         indexing="ij",
-            #     )[0, :, 0]
-                
-            #     usurf = tfa.image.interpolate_bilinear(
-            #         tf.expand_dims(tf.expand_dims(self.usurf, axis=0), axis=-1),
-            #         indices,
-            #         indexing="ij",
-            #     )[0, :, 0]
-                
-            #     uvel = uvelbase + (uvelsurf - uvelbase) * ( 1 - (1 - self.rhpos) ** 4)
-            #     vvel = vvelbase + (vvelsurf - vvelbase) * ( 1 - (1 - self.rhpos) ** 4)
-            #     div  = divbase  + (divsurf - divbase) * self.rhpos
-                
-            #     nthk = tf.maximum( othk + self.dt * (smb - divflux), 0) 
-                  
-            #     z = (1 - self.rhpos) * othk
-                 
-            #     self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
-            #     self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler
-
-            #     z  = z + self.dt * ( self.rhpos * smb - z * div )
-                
-            #     self.rhpos.assign(
-            #         tf.clip_by_value( tf.where( nthk > 0.1, 1 - (z/nthk), 1 ) , 0 , 1 )
-            #     ) 
+                self.xpos.assign(tf.clip_by_value(self.xpos,self.x[0],self.x[-1]))
+                self.ypos.assign(tf.clip_by_value(self.ypos,self.y[0],self.y[-1]))
 
             indices = tf.concat(
                 [
@@ -1559,57 +1510,31 @@ class Igm:
 
             self.tcomp["Tracking"][-1] -= time.time()
             self.tcomp["Tracking"][-1] *= -1
-
+            
     def update_write_trajectories(self):
 
         if self.saveresult:
 
-            for i in range(len(self.seedtimes)):
+            ft = os.path.join(self.config.working_dir, "trajectories", 't.dat')
+            fx = os.path.join(self.config.working_dir, "trajectories", 'x.dat')
+            fy = os.path.join(self.config.working_dir, "trajectories", 'y.dat')
+            fz = os.path.join(self.config.working_dir, "trajectories", 'z.dat')
+            fr = os.path.join(self.config.working_dir, "trajectories", 'r.dat')                        
 
-                yearseed = self.seedtimes[i][0]
-                i0 = 0
-                if i > 0:
-                    i0 = self.seedtimes[i - 1][1]
-                i1 = self.seedtimes[i][1]
-
-                filename = "x-" + str(int(yearseed)) + ".dat"
-                with open(
-                    os.path.join(self.config.working_dir, "trajectories", filename), "a"
-                ) as f:
-                    print(
-                        *list(
-                            np.concatenate(
-                                [[self.t.numpy()], self.xpos[i0:i1].numpy()], axis=0
-                            )
-                        ),
-                        file=f
-                    )
-
-                filename = "y-" + str(int(yearseed)) + ".dat"
-                with open(
-                    os.path.join(self.config.working_dir, "trajectories", filename), "a"
-                ) as f:
-                    print(
-                        *list(
-                            np.concatenate(
-                                [[self.t.numpy()], self.ypos[i0:i1].numpy()], axis=0
-                            )
-                        ),
-                        file=f
-                    )
-
-                filename = "z-" + str(int(yearseed)) + ".dat"
-                with open(
-                    os.path.join(self.config.working_dir, "trajectories", filename), "a"
-                ) as f:
-                    print(
-                        *list(
-                            np.concatenate(
-                                [[self.t.numpy()], self.rhpos[i0:i1].numpy()], axis=0
-                            )
-                        ),
-                        file=f
-                    )
+            with open(ft, "a") as f:
+                print(self.t.numpy(), file=f )    
+                
+            with open(fx, "a") as f:
+                print(*list(self.xpos.numpy()), file=f )      
+ 
+            with open(fy, "a") as f:
+                print(*list(self.ypos.numpy()), file=f )    
+                
+            with open(fz, "a") as f:
+                print(*list(self.zpos.numpy()), file=f )    
+                
+            with open(fr, "a") as f:
+                print(*list(self.rhpos.numpy()), file=f )  
 
     ####################################################################################
     ####################################################################################

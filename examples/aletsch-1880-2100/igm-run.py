@@ -73,8 +73,8 @@ glacier.config.weight_Ewigschneefeld = 1.0
 # This permits to compute particle trajectories
 glacier.config.tracking_method         = '3d'
 glacier.config.tracking_particles      = False  # activate particle tracking
-glacier.config.frequency_seeding       = 5    # we seed every 10 years
-glacier.config.density_seeding         = 0.2   # we seed each 5 point of the 2D grid
+glacier.config.frequency_seeding       = 500    # we seed every 500 years
+glacier.config.density_seeding         = 0.5    # we seed each second point of the 2D grid
 
 # From now, we could have call glacier.run(), but we instead give all steps to embed some 
 # features like defining initial surface, or check modelled vs observed top DEM std
@@ -109,7 +109,8 @@ with tf.device(glacier.device_name):
         glacier.update_smb() 
         glacier.update_iceflow()
         if glacier.config.tracking_particles:
-            glacier.update_particles()
+            if (glacier.t==1880)|(glacier.t>=1885):
+                glacier.update_particles()
         glacier.update_t_dt()
         glacier.update_thk()
         glacier.update_ncdf_ex()
