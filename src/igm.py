@@ -1511,7 +1511,27 @@ class Igm:
             self.tcomp["Tracking"][-1] -= time.time()
             self.tcomp["Tracking"][-1] *= -1
             
+            
     def update_write_trajectories(self):
+
+        if self.saveresult:
+            
+            if not hasattr(self, "already_called_update_write_trajectories"):
+                self.already_called_update_write_trajectories = True
+                self.itime_write_trajectories = 0 
+            
+            else:
+                f = os.path.join(self.config.working_dir, "trajectories", 'traj-'+str(self.itime_write_trajectories)+'.csv') 
+                ft = os.path.join(self.config.working_dir, "trajectories", 'time.dat') 
+                ID = tf.cast(tf.range(self.xpos.shape[0]),dtype='float32')
+                array = tf.transpose(tf.stack([ID,self.xpos,self.ypos,self.zpos,self.rhpos],axis=0))
+                np.savetxt(f, array , delimiter=',', fmt="%.2f", header='Id,x,y,z,rh')
+                self.itime_write_trajectories += 1
+                with open(ft, "a") as f:
+                    print(self.t.numpy(), file=f )  
+                
+
+    def update_write_trajectories_old(self):
 
         if self.saveresult:
 
