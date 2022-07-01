@@ -333,9 +333,11 @@ class Igm:
         self.var_info["velbar_mag"] = ["Depth-average velocity magnitude of ice", "m/y"]
         self.var_info["uvelsurf"] = ["x surface velocity of ice", "m/y"]
         self.var_info["vvelsurf"] = ["y surface velocity of ice", "m/y"]
+        self.var_info["wvelsurf"] = ["z surface velocity of ice", "m/y"]
         self.var_info["velsurf_mag"] = ["Surface velocity magnitude of ice", "m/y"]
         self.var_info["uvelbase"] = ["x basal velocity of ice", "m/y"]
         self.var_info["vvelbase"] = ["y basal velocity of ice", "m/y"]
+        self.var_info["wvelbase"] = ["z basal velocity of ice", "m/y"]
         self.var_info["velbase_mag"] = ["Basal velocity magnitude of ice", "m/y"]
         self.var_info["divflux"] = ["Divergence of the ice flux", "m/y"]
         self.var_info["strflowctrl"] = [
@@ -1459,13 +1461,17 @@ class Igm:
                 
             elif self.config.tracking_method=='3d':
                 
-                slopsurfx, slopsurfy = self.compute_gradient_tf(self.usurf, self.dx, self.dx)
-                sloptopgx, sloptopgy = self.compute_gradient_tf(self.topg, self.dx, self.dx)
+                import tensorflow_addons as tfa
+                susurf = tfa.image.gaussian_filter2d(self.usurf, sigma=3, filter_shape=5, padding="CONSTANT")
+                stopg  = tfa.image.gaussian_filter2d(self.topg , sigma=3, filter_shape=5, padding="CONSTANT")
+                
+                slopsurfx, slopsurfy = self.compute_gradient_tf(susurf, self.dx, self.dx)
+                sloptopgx, sloptopgy = self.compute_gradient_tf(stopg, self.dx, self.dx)
         
                 self.divflux = self.compute_divflux(self.ubar, self.vbar, self.thk, self.dx, self.dx)
         
-                self.wvelbase =                 self.uvelbase * sloptopgx + self.vvelbase * sloptopgy
-                self.wvelsurf = -self.divflux + self.uvelsurf * slopsurfx + self.vvelsurf * slopsurfy
+                self.wvelbase =  self.uvelbase * sloptopgx + self.vvelbase * sloptopgy
+                self.wvelsurf =  self.uvelsurf * slopsurfx + self.vvelsurf * slopsurfy - self.divflux 
                 
                 wvelbase = tfa.image.interpolate_bilinear(
                     tf.expand_dims(tf.expand_dims(self.wvelbase, axis=0), axis=-1),
@@ -1519,6 +1525,9 @@ class Igm:
             if not hasattr(self, "already_called_update_write_trajectories"):
                 self.already_called_update_write_trajectories = True
                 self.itime_write_trajectories = 0 
+                ftt = os.path.join(self.config.working_dir, "trajectories", 'topg.csv') 
+                array = tf.transpose(tf.stack([self.X[self.X>0],self.Y[self.X>0],self.topg[self.X>0]]))
+                np.savetxt(ftt, array , delimiter=',', fmt="%.2f", header='x,y,z')
             
             else:
                 f = os.path.join(self.config.working_dir, "trajectories", 'traj-'+str(self.itime_write_trajectories)+'.csv') 
@@ -1529,6 +1538,10 @@ class Igm:
                 self.itime_write_trajectories += 1
                 with open(ft, "a") as f:
                     print(self.t.numpy(), file=f )  
+                    
+                ftt = os.path.join(self.config.working_dir, "trajectories", 'usurf-'+str(self.itime_write_trajectories)+'.csv') 
+                array = tf.transpose(tf.stack([self.X[self.X>1],self.Y[self.X>1],self.usurf[self.X>1]]))
+                np.savetxt(ftt, array , delimiter=',', fmt="%.2f", header='x,y,z')
                 
 
     def update_write_trajectories_old(self):
