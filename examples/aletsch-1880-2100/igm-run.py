@@ -109,7 +109,7 @@ with tf.device(glacier.device_name):
         glacier.update_smb() 
         glacier.update_iceflow()
         if glacier.config.tracking_particles:
-            if (glacier.t==1880)|(glacier.t>=1885):
+            if (glacier.t>=1900): 
                 glacier.update_particles()
         glacier.update_t_dt()
         glacier.update_thk()
