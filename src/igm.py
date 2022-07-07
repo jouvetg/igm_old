@@ -1362,160 +1362,161 @@ class Igm:
             if os.path.exists(directory):
                 shutil.rmtree(directory)
             os.mkdir(directory)
+  
+        if (self.t.numpy() - self.tlast_seeding) >= self.config.frequency_seeding:
+            self.seeding_particles()
 
-            self.seedtimes = []
+            # merge the new seeding points with the former ones
+            self.xpos = tf.Variable(tf.concat([self.xpos, self.nxpos], axis=-1))
+            self.ypos = tf.Variable(tf.concat([self.ypos, self.nypos], axis=-1))
+            self.zpos = tf.Variable(tf.concat([self.zpos, self.nzpos], axis=-1))
+            self.rhpos = tf.Variable(tf.concat([self.rhpos, self.nrhpos], axis=-1))
+            self.wpos = tf.Variable(tf.concat([self.wpos, self.nwpos], axis=-1))
 
-        else:
+            self.tlast_seeding = self.t.numpy() 
 
-            if (self.t.numpy() - self.tlast_seeding) >= self.config.frequency_seeding:
-                self.seeding_particles()
+        self.tcomp["Tracking"].append(time.time())
+        
+        self.update_write_trajectories()
 
-                # merge the new seeding points with the former ones
-                self.xpos = tf.Variable(tf.concat([self.xpos, self.nxpos], axis=-1))
-                self.ypos = tf.Variable(tf.concat([self.ypos, self.nypos], axis=-1))
-                self.zpos = tf.Variable(tf.concat([self.zpos, self.nzpos], axis=-1))
-                self.rhpos = tf.Variable(tf.concat([self.rhpos, self.nrhpos], axis=-1))
-                self.wpos = tf.Variable(tf.concat([self.wpos, self.nwpos], axis=-1))
+        # find the indices of trajectories
+        # these indicies are real values to permit 2D interpolations
+        i = (self.xpos - self.x[0]) / self.dx
+        j = (self.ypos - self.y[0]) / self.dx
 
-                self.tlast_seeding = self.t.numpy()
-                self.seedtimes.append([self.t.numpy(), self.xpos.shape[0]])
+        indices = tf.expand_dims(
+            tf.concat(
+                [tf.expand_dims(j, axis=-1), tf.expand_dims(i, axis=-1)], axis=-1
+            ),
+            axis=0,
+        )
 
-            self.tcomp["Tracking"].append(time.time())
+        uvelbase = tfa.image.interpolate_bilinear(
+            tf.expand_dims(tf.expand_dims(self.uvelbase, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
 
-            # find the indices of trajectories
-            # these indicies are real values to permit 2D interpolations
-            i = (self.xpos - self.x[0]) / self.dx
-            j = (self.ypos - self.y[0]) / self.dx
+        vvelbase = tfa.image.interpolate_bilinear(
+            tf.expand_dims(tf.expand_dims(self.vvelbase, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
 
-            indices = tf.expand_dims(
-                tf.concat(
-                    [tf.expand_dims(j, axis=-1), tf.expand_dims(i, axis=-1)], axis=-1
-                ),
-                axis=0,
-            )
+        uvelsurf = tfa.image.interpolate_bilinear(
+            tf.expand_dims(tf.expand_dims(self.uvelsurf, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
 
-            uvelbase = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.uvelbase, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
+        vvelsurf = tfa.image.interpolate_bilinear(
+            tf.expand_dims(tf.expand_dims(self.vvelsurf, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
 
-            vvelbase = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.vvelbase, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
+        othk = tfa.image.interpolate_bilinear(
+            tf.expand_dims(tf.expand_dims(self.thk, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
+        
+        topg = tfa.image.interpolate_bilinear(
+            tf.expand_dims(tf.expand_dims(self.topg, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
+         
+        smb = tfa.image.interpolate_bilinear(
+            tf.expand_dims(tf.expand_dims(self.smb, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
+        
+        if self.config.tracking_method=='simple':
 
-            uvelsurf = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.uvelsurf, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
+            nthk = othk + smb * self.dt  # new ice thicnkess after smb update
 
-            vvelsurf = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.vvelsurf, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-
-            othk = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.thk, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-            
-            topg = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.topg, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-             
-            smb = tfa.image.interpolate_bilinear(
-                tf.expand_dims(tf.expand_dims(self.smb, axis=0), axis=-1),
-                indices,
-                indexing="ij",
-            )[0, :, 0]
-            
-            if self.config.tracking_method=='simple':
-
-                nthk = othk + smb * self.dt  # new ice thicnkess after smb update
-    
-                # adjust the relative height within the ice column with smb
-                self.rhpos.assign(
-                    tf.where(
-                        nthk > 0.1, tf.clip_by_value(self.rhpos * othk / nthk, 0, 1), 1
-                    )
+            # adjust the relative height within the ice column with smb
+            self.rhpos.assign(
+                tf.where(
+                    nthk > 0.1, tf.clip_by_value(self.rhpos * othk / nthk, 0, 1), 1
                 )
-                
-                uvel = uvelbase + (uvelsurf - uvelbase) * (
-                    1 - (1 - self.rhpos) ** 4
-                )  # SIA-like
-                vvel = vvelbase + (vvelsurf - vvelbase) * (
-                    1 - (1 - self.rhpos) ** 4
-                )  # SIA-like
+            )
+            
+            uvel = uvelbase + (uvelsurf - uvelbase) * (
+                1 - (1 - self.rhpos) ** 4
+            )  # SIA-like
+            vvel = vvelbase + (vvelsurf - vvelbase) * (
+                1 - (1 - self.rhpos) ** 4
+            )  # SIA-like
+
+            self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
+            self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler 
+            
+            self.zpos.assign( topg + nthk * self.rhpos  )
+            
+        elif self.config.tracking_method=='3d':
+            
+# This was a test of smoothing the surface topography to regaluraze the vertical velocitiy.                
+#                import tensorflow_addons as tfa
+#                susurf = tfa.image.gaussian_filter2d(self.usurf, sigma=5, filter_shape=5, padding="CONSTANT")
+#                stopg  = tfa.image.gaussian_filter2d(self.topg , sigma=3, filter_shape=5, padding="CONSTANT")
+            
+            slopsurfx, slopsurfy = self.compute_gradient_tf(self.usurf, self.dx, self.dx)
+            sloptopgx, sloptopgy = self.compute_gradient_tf(self.topg, self.dx, self.dx)
     
-                self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
-                self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler 
-                
-                self.zpos.assign( topg + nthk * self.rhpos  )
-                
-            elif self.config.tracking_method=='3d':
-                
-                import tensorflow_addons as tfa
-                susurf = tfa.image.gaussian_filter2d(self.usurf, sigma=3, filter_shape=5, padding="CONSTANT")
-                stopg  = tfa.image.gaussian_filter2d(self.topg , sigma=3, filter_shape=5, padding="CONSTANT")
-                
-                slopsurfx, slopsurfy = self.compute_gradient_tf(susurf, self.dx, self.dx)
-                sloptopgx, sloptopgy = self.compute_gradient_tf(stopg, self.dx, self.dx)
-        
-                self.divflux = self.compute_divflux(self.ubar, self.vbar, self.thk, self.dx, self.dx)
-        
-                self.wvelbase =  self.uvelbase * sloptopgx + self.vvelbase * sloptopgy
-                self.wvelsurf =  self.uvelsurf * slopsurfx + self.vvelsurf * slopsurfy - self.divflux 
-                
-                wvelbase = tfa.image.interpolate_bilinear(
-                    tf.expand_dims(tf.expand_dims(self.wvelbase, axis=0), axis=-1),
-                    indices,
-                    indexing="ij",
-                )[0, :, 0]
-                
-                wvelsurf = tfa.image.interpolate_bilinear(
-                    tf.expand_dims(tf.expand_dims(self.wvelsurf, axis=0), axis=-1),
-                    indices,
-                    indexing="ij",
-                )[0, :, 0]
+            self.divflux = self.compute_divflux(self.ubar, self.vbar, self.thk, self.dx, self.dx)
+     
+            # the vertical velocity is the scalar product of horizont. velo and bedrock gradient
+            self.wvelbase =  self.uvelbase * sloptopgx + self.vvelbase * sloptopgy
+            # Using rules of derivative the surface vertical velocity can be found from the
+            # divergence of the flux considering that the ice 3d velocity is divergence-free.
+            self.wvelsurf =  self.uvelsurf * slopsurfx + self.vvelsurf * slopsurfy - self.divflux 
+            
+            wvelbase = tfa.image.interpolate_bilinear(
+                tf.expand_dims(tf.expand_dims(self.wvelbase, axis=0), axis=-1),
+                indices,
+                indexing="ij",
+            )[0, :, 0]
+            
+            wvelsurf = tfa.image.interpolate_bilinear(
+                tf.expand_dims(tf.expand_dims(self.wvelsurf, axis=0), axis=-1),
+                indices,
+                indexing="ij",
+            )[0, :, 0]
+            
+#           print('at the surface? : ',all(self.zpos == topg+othk))
 
-                self.zpos.assign( tf.clip_by_value( self.zpos , topg, topg+othk) )
-                
-                self.rhpos.assign( tf.where( othk > 0.1, (self.zpos - topg)/othk , 1 ) )
-                 
-                uvel = uvelbase + (uvelsurf - uvelbase) * ( 1 - (1 - self.rhpos) ** 4)
-                vvel = vvelbase + (vvelsurf - vvelbase) * ( 1 - (1 - self.rhpos) ** 4)
-                wvel = wvelbase + (wvelsurf - wvelbase) * ( 1 - (1 - self.rhpos) ** 4)
-                   
-                self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
-                self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler 
-                self.zpos.assign(self.zpos + self.dt * wvel)  # forward euler 
-                
-                self.xpos.assign(tf.clip_by_value(self.xpos,self.x[0],self.x[-1]))
-                self.ypos.assign(tf.clip_by_value(self.ypos,self.y[0],self.y[-1]))
+            self.zpos.assign( tf.clip_by_value( self.zpos , topg, topg+othk) )
+            
+            self.rhpos.assign( tf.where( othk > 0.1, (self.zpos - topg)/othk , 1 ) )
+             
+            uvel = uvelbase + (uvelsurf - uvelbase) * ( 1 - (1 - self.rhpos) ** 4)
+            vvel = vvelbase + (vvelsurf - vvelbase) * ( 1 - (1 - self.rhpos) ** 4)
+            wvel = wvelbase + (wvelsurf - wvelbase) * ( 1 - (1 - self.rhpos) ** 4)
+               
+            self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
+            self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler 
+            self.zpos.assign(self.zpos + self.dt * wvel)  # forward euler 
+            
+            self.xpos.assign(tf.clip_by_value(self.xpos,self.x[0],self.x[-1]))
+            self.ypos.assign(tf.clip_by_value(self.ypos,self.y[0],self.y[-1]))
 
-            indices = tf.concat(
-                [
-                    tf.expand_dims(tf.cast(j, dtype="int32"), axis=-1),
-                    tf.expand_dims(tf.cast(i, dtype="int32"), axis=-1),
-                ],
-                axis=-1,
-            )
-            updates = tf.cast(tf.where(self.rhpos == 1, self.wpos, 0), dtype="float32")
-            self.weight_particles = tf.tensor_scatter_nd_add(
-                tf.zeros_like(self.thk), indices, updates
-            )
+        indices = tf.concat(
+            [
+                tf.expand_dims(tf.cast(j, dtype="int32"), axis=-1),
+                tf.expand_dims(tf.cast(i, dtype="int32"), axis=-1),
+            ],
+            axis=-1,
+        )
+        updates = tf.cast(tf.where(self.rhpos == 1, self.wpos, 0), dtype="float32")
+        self.weight_particles = tf.tensor_scatter_nd_add(
+            tf.zeros_like(self.thk), indices, updates
+        )
 
-            self.update_write_trajectories()
-
-            self.tcomp["Tracking"][-1] -= time.time()
-            self.tcomp["Tracking"][-1] *= -1
+        self.tcomp["Tracking"][-1] -= time.time()
+        self.tcomp["Tracking"][-1] *= -1
             
             
     def update_write_trajectories(self):
@@ -1528,21 +1529,20 @@ class Igm:
                 ftt = os.path.join(self.config.working_dir, "trajectories", 'topg.csv') 
                 array = tf.transpose(tf.stack([self.X[self.X>0],self.Y[self.X>0],self.topg[self.X>0]]))
                 np.savetxt(ftt, array , delimiter=',', fmt="%.2f", header='x,y,z')
-            
-            else:
-                f = os.path.join(self.config.working_dir, "trajectories", 'traj-'+str(self.itime_write_trajectories)+'.csv') 
-                ft = os.path.join(self.config.working_dir, "trajectories", 'time.dat') 
-                ID = tf.cast(tf.range(self.xpos.shape[0]),dtype='float32')
-                array = tf.transpose(tf.stack([ID,self.xpos,self.ypos,self.zpos,self.rhpos],axis=0))
-                np.savetxt(f, array , delimiter=',', fmt="%.2f", header='Id,x,y,z,rh')
-                self.itime_write_trajectories += 1
-                with open(ft, "a") as f:
-                    print(self.t.numpy(), file=f )  
-                    
-                ftt = os.path.join(self.config.working_dir, "trajectories", 'usurf-'+str(self.itime_write_trajectories)+'.csv') 
-                array = tf.transpose(tf.stack([self.X[self.X>1],self.Y[self.X>1],self.usurf[self.X>1]]))
-                np.savetxt(ftt, array , delimiter=',', fmt="%.2f", header='x,y,z')
+             
+            f = os.path.join(self.config.working_dir, "trajectories", 'traj-'+str(self.itime_write_trajectories)+'.csv') 
+            ft = os.path.join(self.config.working_dir, "trajectories", 'time.dat') 
+            ID = tf.cast(tf.range(self.xpos.shape[0]),dtype='float32')
+            array = tf.transpose(tf.stack([ID,self.xpos,self.ypos,self.zpos,self.rhpos],axis=0))
+            np.savetxt(f, array , delimiter=',', fmt="%.2f", header='Id,x,y,z,rh')
+            self.itime_write_trajectories += 1
+            with open(ft, "a") as f:
+                print(self.t.numpy(), file=f )  
                 
+            ftt = os.path.join(self.config.working_dir, "trajectories", 'usurf-'+str(self.itime_write_trajectories)+'.csv') 
+            array = tf.transpose(tf.stack([self.X[self.X>1],self.Y[self.X>1],self.usurf[self.X>1]]))
+            np.savetxt(ftt, array , delimiter=',', fmt="%.2f", header='x,y,z')
+            
 
     def update_write_trajectories_old(self):
 
@@ -3357,22 +3357,20 @@ class Igm:
                     vmin=0,
                     vmax=self.config.varplot_max,
                     extent=self.extent
+                ) 
+                self.ip = self.ax.scatter(
+                    x=[self.x[0]],
+                    y=[self.y[0]],
+                    c=[1],
+                    vmin=0,
+                    vmax=1,
+                    s=0.5,
+                    cmap="RdBu",
                 )
-                if self.config.tracking_particles:
-                    r = 1
-                    self.ip = self.ax.scatter(
-                        x=self.xpos[::r],
-                        y=self.ypos[::r],
-                        c=1 - self.rhpos[::r].numpy(),
-                        vmin=0,
-                        vmax=1,
-                        s=0.5,
-                        cmap="RdBu",
-                    )
                 self.ax.set_title("YEAR : " + str(self.t.numpy()), size=15)
                 self.cbar = plt.colorbar(im)
-                # self.ax.set_xlim(427500, 430000)
-                # self.ax.set_ylim(5142250,5147050)
+#                self.ax.set_xlim(427500, 430000)
+#                self.ax.set_ylim(5142250,5147050)
             else:
                 im = self.ax.imshow(
                     vars(self)[self.config.varplot],
@@ -3382,7 +3380,7 @@ class Igm:
                     vmax=self.config.varplot_max,
                     extent=self.extent
                 )
-                if self.config.tracking_particles:
+                if hasattr(self,'xpos'):
                     self.ip.set_visible(False)
                     r = 1
                     self.ip = self.ax.scatter(
