@@ -71,8 +71,8 @@ glacier.config.weight_Jungfraufirn   = 1.0
 glacier.config.weight_Ewigschneefeld = 1.0
 
 # This permits to compute particle trajectories
+tracking_particles                     = False  # activate particle tracking
 glacier.config.tracking_method         = '3d'
-glacier.config.tracking_particles      = False  # activate particle tracking
 glacier.config.frequency_seeding       = 500    # we seed every 500 years
 glacier.config.density_seeding         = 0.5    # we seed each second point of the 2D grid
 
@@ -108,7 +108,7 @@ with tf.device(glacier.device_name):
         glacier.update_climate()
         glacier.update_smb() 
         glacier.update_iceflow()
-        if glacier.config.tracking_particles:
+        if tracking_particles:
             if (glacier.t>=1900): 
                 glacier.update_particles()
         glacier.update_t_dt()

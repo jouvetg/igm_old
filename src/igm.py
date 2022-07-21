@@ -5,8 +5,8 @@ Copyright (C) 2021-2022 Guillaume Jouvet <guillaume.jouvet@geo.uzh.ch>
 Published under the GNU GPL (Version 3), check at the LICENSE file
 """
 
-# This file contains the core functions the Instructed Glacier Model (IGM),
-# functions are sorted by thema, which are
+# This file contains all core functions the Instructed Glacier Model (IGM),
+# functions that are sorted thematic-wise as follows:
 
 #      INITIALIZATION : contains all to initialize variables
 #      I/O NCDF : Files for data Input/Output using NetCDF file format
@@ -34,10 +34,7 @@ import tensorflow as tf
 from netCDF4 import Dataset
 from scipy.interpolate import interp1d, CubicSpline, RectBivariateSpline, griddata
 import argparse
-from IPython.display import display, clear_output
-from numpy import dtype
 from scipy import stats
-
 
 def str2bool(v):
     return v.lower() in ("true", "1")
@@ -58,15 +55,23 @@ class Igm:
         """
         function build class IGM
         """
+        
+        # Read parameters
         self.parser = argparse.ArgumentParser(description="IGM")
         self.read_config_param()
         self.config = self.parser.parse_args()
 
+        # These 3 lines were found necessary to ensure compatibility with newest TF
         config = tf.compat.v1.ConfigProto()
         config.gpu_options.allow_growth = True
         session = tf.compat.v1.Session(config=config)
+                
+        print('Build IGM class')
 
     def read_config_param(self):
+        """
+        LIst of the main IGM parameters (some others are defined in other functions)
+        """
 
         self.parser.add_argument(
             "--working_dir", 
@@ -157,7 +162,8 @@ class Igm:
             default=78, 
             help="Initial arrhenius factor arrhenuis (default: 78)",
         )
-
+        
+        # Read all parameters defined in function read_config_param_*
         for p in dir(self):
             if "read_config_param_" in p:
                 getattr(self, p)()
@@ -173,6 +179,7 @@ class Igm:
             "+++++++++++++++++++ START IGM ++++++++++++++++++++++++++++++++++++++++++"
         )
 
+        # Initialize time, time step, saving result flag, ...
         self.t = tf.Variable(float(self.config.tstart))
         self.it = 0
         self.dt = float(self.config.dtmax)
@@ -180,9 +187,11 @@ class Igm:
 
         self.saveresult = True
 
+        # All statisitics of the computational times taken by any components will be stored here
         self.tcomp = {}
         self.tcomp["All"] = []
 
+        # Define the device name to perform computations (CPU or GPU)
         self.device_name = "/GPU:0" * self.config.usegpu + "/CPU:0" * (
             not self.config.usegpu
         )
@@ -198,6 +207,7 @@ class Igm:
         #        tf.config.threading.set_inter_op_parallelism_threads(1)  # another method
         #        tf.config.threading.set_intra_op_parallelism_threads(1)  # another method
 
+        # Print parameters in screen and a dedicated file
         with open(
             os.path.join(self.config.working_dir, "igm-run-parameters.txt"), "w"
         ) as f:
@@ -205,6 +215,10 @@ class Igm:
             for ck in self.config.__dict__:
                 print("%30s : %s" % (ck, self.config.__dict__[ck]))
                 print("%30s : %s" % (ck, self.config.__dict__[ck]), file=f)
+
+        # prepare the clean.sh file to remove all files created in one run
+        os.system('echo rm -r '+ os.path.join(self.config.working_dir, "__pycache__") + ' > clean.sh')
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "igm-run-parameters.txt") + ' >> clean.sh')
 
     def load_ncdf_data(self, filename):
         """
@@ -217,13 +231,17 @@ class Igm:
 
         x = np.squeeze(nc.variables["x"]).astype("float32")
         y = np.squeeze(nc.variables["y"]).astype("float32")
+        
+        # make sure the grid has same cell spacing in x and y
         assert x[1] - x[0] == y[1] - y[0]
 
+        # load any field contained in the ncdf file, replace missing entries by nan
         for var in nc.variables:
             if not var in ["x", "y"]:
                 vars()[var] = np.squeeze(nc.variables[var]).astype("float32")
                 vars()[var] = np.where(vars()[var] > 10 ** 35, np.nan, vars()[var])
 
+        # resample if requested
         if self.config.resample > 1:
             xx = x[:: self.config.resample]
             yy = y[:: self.config.resample]
@@ -233,6 +251,7 @@ class Igm:
             x = xx
             y = yy
 
+        # transform from numpy to tensorflow
         for var in nc.variables:
             if var in ["x", "y"]:
                 vars(self)[var] = tf.constant(vars()[var].astype("float32"))
@@ -249,47 +268,40 @@ class Igm:
         if self.config.verbosity == 1:
             print("Initialize fields")
 
-        # at this point, we should have defined at least x, y, usurf
+        # at this point, we should have defined at least x, y
         assert hasattr(self, "x")
         assert hasattr(self, "y")
 
         if hasattr(self, "usurfobs"):
             self.usurf = tf.Variable(self.usurfobs)
 
-        assert hasattr(self, "usurf")
-
+        # if thickness is not defined in the netcdf, then it is set to zero
         if not hasattr(self, "thk"):
             self.thk = tf.Variable(tf.zeros((self.y.shape[0], self.x.shape[0])))
 
-        self.topg = tf.Variable(self.usurf - self.thk)
+        # at this point, we should have defined at least topg or usurf
+        assert hasattr(self, "topg") | hasattr(self, "usurf")
 
+        # define usurf (or topg) from topg (or usurf) and thk
+        if hasattr(self, "usurf"):
+            self.topg  = tf.Variable(self.usurf - self.thk)
+        else:
+            self.usurf = tf.Variable(self.topg + self.thk)
+            
+        # if no icemask, create a mask with one everywhere
         if not hasattr(self, "icemask"):
-            if hasattr(self, "mask"):
-                self.icemask = tf.Variable(self.mask)
-            else:
-                self.icemask = tf.Variable(tf.ones_like(self.thk))
+            self.icemask = tf.Variable(tf.ones_like(self.thk))
 
-        if not hasattr(self, "uvelsurf"):
-            self.uvelsurf = tf.Variable(tf.zeros_like(self.thk))
+        # Here we initialize to zero a set of variables used later on
+        var_to_init  = ["uvelsurf","vvelsurf","wvelsurf"]
+        var_to_init += ["uvelbase","vvelbase","wvelbase","ubar","vbar"]
+        var_to_init += ["smb","dhdt","divflux"] # TODO: remove dhdt?
+        
+        for var in var_to_init:
+            if not hasattr(self, var):
+                vars(self)[var] = tf.Variable(tf.zeros_like(self.thk))
 
-        if not hasattr(self, "vvelsurf"):
-            self.vvelsurf = tf.Variable(tf.zeros_like(self.thk))
-
-        if not hasattr(self, "wvelbase"):
-            self.wvelbase = tf.Variable(tf.zeros_like(self.thk))
-
-        if not hasattr(self, "wvelsurf"):
-            self.wvelsurf = tf.Variable(tf.zeros_like(self.thk))
-
-        if not hasattr(self, "smb"):
-            if hasattr(self, "mb"):
-                self.smb = tf.Variable(self.mb)
-            else:
-                self.smb = tf.Variable(tf.zeros_like(self.thk))
-
-        if not hasattr(self, "dhdt"):
-            self.dhdt = tf.Variable(tf.zeros_like(self.thk))
-
+        # here we initialize variable parmaetrizing ice flow
         if not hasattr(self, "strflowctrl"):
             self.strflowctrl = tf.Variable(
                 tf.ones_like(self.thk) * self.config.init_strflowctrl
@@ -304,24 +316,19 @@ class Igm:
             self.slidingco = tf.Variable(
                 tf.ones_like(self.thk) * self.config.init_slidingco
             )
-
-        if self.config.erosion_include:
-            self.dtopgdt = tf.Variable(tf.zeros_like(self.thk))
-
+ 
+        # define grids, i.e. self.X and self.Y has same shape as self.thk
         self.X, self.Y = tf.meshgrid(self.x, self.y)
 
+        # define cell spacing
         self.dx = self.x[1] - self.x[0]
 
+        # compiute surface gradient
         self.slopsurfx, self.slopsurfy = self.compute_gradient_tf(
             self.usurf, self.dx, self.dx
         )
 
-        self.ubar = tf.Variable(tf.zeros_like(self.thk))
-        self.vbar = tf.Variable(tf.zeros_like(self.thk))
-        self.uvelbase = tf.Variable(tf.zeros_like(self.thk))
-        self.vvelbase = tf.Variable(tf.zeros_like(self.thk))
-        self.divflux = tf.Variable(tf.zeros_like(self.thk))
-
+        # give information on variables for output ncdf, TODO: IMPROVE
         self.var_info = {}
         self.var_info["topg"] = ["Basal Topography", "m"]
         self.var_info["usurf"] = ["Surface Topography", "m"]
@@ -340,10 +347,7 @@ class Igm:
         self.var_info["wvelbase"] = ["z basal velocity of ice", "m/y"]
         self.var_info["velbase_mag"] = ["Basal velocity magnitude of ice", "m/y"]
         self.var_info["divflux"] = ["Divergence of the ice flux", "m/y"]
-        self.var_info["strflowctrl"] = [
-            "arrhenius + 10 * slidingco",
-            "MPa$^{-3}$ a$^{-1}$",
-        ]
+        self.var_info["strflowctrl"] = ["arrhenius+1.0*slidingco","MPa$^{-3}$ a$^{-1}$"]
         self.var_info["dtopgdt"] = ["Erosion rate", "m/y"]
         self.var_info["arrhenius"] = ["Arrhenius factor", "MPa$^{-3}$ a$^{-1}$"]
         self.var_info["slidingco"] = ["Sliding Coefficient", "km MPa$^{-3}$ a$^{-1}$"]
@@ -351,11 +355,7 @@ class Igm:
         self.var_info["meanprec"] = ["Mean anual precipitation", "m/y"]
         self.var_info["vol"] = ["Ice volume", "km^3"]
         self.var_info["area"] = ["Glaciated area", "km^2"]
-
-        self.var_info["velsurfobs_mag"] = [
-            "Observed Surface velocity magnitude of ice",
-            "m/y",
-        ]
+        self.var_info["velsurfobs_mag"] = ["Obs. surf. speed of ice","m/y"]
 
     def restart(self):
         """
@@ -369,9 +369,11 @@ class Igm:
         Rx = tf.constant(np.squeeze(nc.variables["x"]).astype("float32"))
         Ry = tf.constant(np.squeeze(nc.variables["y"]).astype("float32"))
 
+        # check consistency between original ncdf and restart file
         assert Rx.shape == self.x.shape
         assert Ry.shape == self.y.shape
 
+        # load all variables
         for var in nc.variables:
             if not var in ["x", "y"]:
                 vars(self)[var].assign(
@@ -389,6 +391,9 @@ class Igm:
         mb_np = self.smb.numpy()
 
     def whatsize(self, n):
+        """
+        this is a simple function that serves to monitor the space in Mbyte taken by a variable
+        """
         s = float(n.size * n.itemsize) / (10 ** 6)
         print("%1.0f Mbytes" % s)
 
@@ -409,7 +414,7 @@ class Igm:
             help="List of variables to be recorded in the ncdf file",
         )
 
-    def update_ncdf_ex(self, force=False):
+    def update_ncdf_ex(self):
         """
         This function write 2D field variables defined in the list config.vars_to_save into the ncdf output file ex.nc
         """
@@ -418,7 +423,7 @@ class Igm:
             self.tcomp["Outputs ncdf"] = []
             self.already_called_update_ncdf_ex = True
 
-        if force | self.saveresult:
+        if self.saveresult:
 
             self.tcomp["Outputs ncdf"].append(time.time())
 
@@ -479,6 +484,8 @@ class Igm:
                     E[0, :, :] = vars(self)[var].numpy()
 
                 nc.close()
+                
+                os.system('echo rm '+ os.path.join(self.config.working_dir, "ex.nc") + ' >> clean.sh')
 
             else:
 
@@ -499,7 +506,7 @@ class Igm:
             self.tcomp["Outputs ncdf"][-1] -= time.time()
             self.tcomp["Outputs ncdf"][-1] *= -1
 
-    def update_ncdf_ts(self, force=False):
+    def update_ncdf_ts(self):
         """
         This function write time serie variables (ice glaziated area and volume) into the ncdf output file ts.nc
         """
@@ -507,7 +514,7 @@ class Igm:
         if not hasattr(self, "already_called_update_ncdf_ts"):
             self.already_called_update_ncdf_ts = True
 
-        if force | self.saveresult:
+        if self.saveresult:
 
             vol = np.sum(self.thk) * (self.dx ** 2) / 10 ** 9
             area = np.sum(self.thk > 1) * (self.dx ** 2) / 10 ** 6
@@ -536,6 +543,8 @@ class Igm:
                     E.long_name = self.var_info[var][0]
                     E.units = self.var_info[var][1]
                 nc.close()
+                
+                os.system('echo rm '+ os.path.join(self.config.working_dir, "ts.nc") + ' >> clean.sh')
 
             else:
 
@@ -577,7 +586,7 @@ class Igm:
 
     def update_t_dt(self):
         """
-        Function glacier.update_t_dt() return time step dt (computed to comply with the CFL condition), updated time t, and a boolean telling whether results must be saved or not. For stability reasons of the transport scheme for the ice thickness evolution, the time step must respect a CFL condition, controlled by parameter glacier.config.cfl, which is the maximum number of cells crossed in one iteration (this parameter cannot exceed one). 
+        Function update_t_dt() return time step dt (computed to satisfy the CFL condition), updated time t, and a boolean telling whether results must be saved or not. For stability reasons of the transport scheme for the ice thickness evolution, the time step must respect a CFL condition, controlled by parameter glacier.config.cfl, which is the maximum number of cells crossed in one iteration (this parameter cannot exceed one). 
         """
         if self.config.verbosity == 1:
             print("Update DT from the CFL condition at time : ", self.t.numpy())
@@ -594,11 +603,13 @@ class Igm:
         else:
             self.tcomp["Time step"].append(time.time())
 
+            # compute maximum ice velocitiy magnitude
             velomax = max(
                 tf.math.reduce_max(tf.math.abs(self.ubar)),
                 tf.math.reduce_max(tf.math.abs(self.vbar)),
             ).numpy()
 
+            # dt_target account for both cfl and dt_max
             if velomax > 0:
                 self.dt_target = min(
                     self.config.cfl * self.dx / velomax, self.config.dtmax
@@ -607,7 +618,8 @@ class Igm:
                 self.dt_target = self.config.dtmax
 
             self.dt = self.dt_target
-
+            
+            # modify dt such that times of requested savings are reached exactly
             if self.tsave[self.itsave + 1] <= self.t.numpy() + self.dt:
                 self.dt = self.tsave[self.itsave + 1] - self.t.numpy()
                 self.t.assign(self.tsave[self.itsave + 1])
@@ -699,7 +711,7 @@ class Igm:
             "--multiple_window_size",
             type=int,
             default=0,
-            help="In case the ANN is a U-net, it must force window size to be multiple of e.g. 8 (default: 0)",
+            help="In case the ANN is a U-net, it must force window size to be multiple of 2**N (default: 0)",
         )
         self.parser.add_argument(
             "--force_max_velbar",
@@ -717,6 +729,7 @@ class Igm:
 
         assert os.path.isdir(dirpath)
 
+        # fieldin, fieldout, fieldbounds contains name of I/O variables, and bounds for scaling
         fieldin, fieldout, fieldbounds = self.read_fields_and_bounds(dirpath)
 
         self.iceflow_mapping = {}
@@ -728,11 +741,12 @@ class Igm:
             os.path.join(dirpath, "model.h5")
         )
 
-        #        print(self.iceflow_model.summary())
+        # print(self.iceflow_model.summary())
 
         Ny = self.thk.shape[0]
         Nx = self.thk.shape[1]
-
+        
+        # In case of a U-net, must make sure the I/O size is multiple of 2**N
         if self.config.multiple_window_size > 0:
             NNy = self.config.multiple_window_size * math.ceil(
                 Ny / self.config.multiple_window_size
@@ -770,6 +784,7 @@ class Igm:
 
         self.tcomp["Ice flow"].append(time.time())
 
+        # Define the input of the NN, include scaling
         X = tf.expand_dims(
             tf.stack(
                 [
@@ -782,8 +797,10 @@ class Igm:
             axis=0,
         )
 
+        # Get the ice flow after applying the NN
         Y = self.iceflow_model.predict_on_batch(X)
 
+        # Appplying scaling, and update variables
         Ny, Nx = self.thk.shape
         for kk, f in enumerate(self.iceflow_mapping["fieldout"]):
             vars(self)[f].assign(
@@ -791,6 +808,7 @@ class Igm:
                 * self.iceflow_fieldbounds[f]
             )
 
+        # If requested, the speeds are artifically upper-bounded
         if self.config.force_max_velbar > 0:
 
             self.velbar_mag = self.getmag(self.ubar, self.vbar)
@@ -836,7 +854,7 @@ class Igm:
             help="This keywork serves to identify & call the climate forcing. If an empty string, this function is not called (Default: "")",
         )
 
-    def update_climate(self, force=False):
+    def update_climate(self):
         """
         This function serves to define a climate forcing (e.g. monthly temperature and precipitation fields) to be used for the surface mass balance model (e.g. accumulation/melt PDD-like model). No climate forcing is provided with IGM is this is case-dependent. Check at the aletsch-1880-21000 example.
         """
@@ -854,7 +872,7 @@ class Igm:
                 self.t.numpy() - self.tlast_clim
             ) >= self.config.clim_update_freq
 
-            if force | new_clim_needed:
+            if new_clim_needed:
 
                 if self.config.verbosity == 1:
                     print("Construct climate at time : ", self.t)
@@ -911,7 +929,7 @@ class Igm:
 
     def init_smb_simple(self):
         """
-        initialize simple mass balance
+        Read parameters of simple mass balance from an ascii file
         """
         param = np.loadtxt(
             os.path.join(self.config.working_dir, self.config.mb_simple_file),
@@ -963,7 +981,7 @@ class Igm:
 
     def init_smb_nn(self):
         """
-        set-up the smb nn emulator
+        initialize smb Neural Network
         """
 
         dirpath = os.path.join(self.config.smb_model_lib_path, str(int(self.dx)))
@@ -983,7 +1001,7 @@ class Igm:
 
     def update_smb_nn(self):
         """
-        function update the smb using the neural network emulator
+        function update the smb using the neural network
         """
 
         # this is not a nice implementation, but for now, it does the job
@@ -1009,7 +1027,7 @@ class Igm:
         for kk, f in enumerate(self.smb_mapping["fieldout"]):
             vars(self)[f].assign(Y[0, :, :, kk] * self.smb_fieldbounds[f])
 
-    def update_smb(self, force=False):
+    def update_smb(self):
         """
         This function permits to choose between several surface mass balance models:
                 
@@ -1028,7 +1046,7 @@ class Igm:
                     getattr(self, "init_smb_" + self.config.type_mass_balance)()
             self.already_called_update_smb = True
 
-        if (force) | ((self.t.numpy() - self.tlast_mb) >= self.config.mb_update_freq):
+        if ((self.t.numpy() - self.tlast_mb) >= self.config.mb_update_freq):
 
             if self.config.verbosity == 1:
                 print("Construct mass balance at time : ", self.t.numpy())
@@ -1118,9 +1136,10 @@ class Igm:
             if not hasattr(self, "already_called_update_topg"):
                 self.tlast_erosion = self.config.tstart
                 self.tlast_uplift = self.config.tstart
+                self.dtopgdt = tf.Variable(tf.zeros_like(self.thk))
                 self.tcomp["Erosion"] = []
                 self.tcomp["Uplift"] = []
-                self.already_called_update_topg = True
+                self.already_called_update_topg = True    
 
         if self.config.erosion_include:
 
@@ -1133,6 +1152,7 @@ class Igm:
 
                 self.velbase_mag = self.getmag(self.uvelbase, self.vvelbase)
 
+                # apply erosion law, erosion rate is proportional to a power of basal sliding speed
                 self.dtopgdt.assign(
                     self.config.erosion_cst
                     * (self.velbase_mag ** self.config.erosion_exp)
@@ -1160,6 +1180,7 @@ class Igm:
 
                 self.tcomp["Uplift"].append(time.time())
 
+                # apply constant uplift rate
                 self.topg.assign(
                     self.topg
                     + self.config.uplift_rate * (self.t.numpy() - self.tlast_uplift)
@@ -1205,8 +1226,10 @@ class Igm:
                 tf.maximum(self.thk + self.dt * (self.smb - self.divflux), 0)
             )
 
+            # update ice surface accordingly
             self.usurf.assign(self.topg + self.thk)
 
+            # update gradients of the surface (slopes)
             self.slopsurfx, self.slopsurfy = self.compute_gradient_tf(
                 self.usurf, self.dx, self.dx
             )
@@ -1254,17 +1277,10 @@ class Igm:
     def read_config_param_tracking(self):
 
         self.parser.add_argument(
-            "--tracking_particles",
-            type=bool,
-            default=False,
-            help="Is the particle tracking active? (Default: False)",
-        )
-
-        self.parser.add_argument(
             "--tracking_method",
             type=str,
             default='3d',
-            help="Method for tracking particles",
+            help="Method for tracking particles (3d or simple)",
         )
 
         self.parser.add_argument(
@@ -1306,24 +1322,24 @@ class Igm:
 
         #        J = (thk>1)
 
-        I = (self.thk > 10) & (self.smb > -2) & self.gridseed
-        self.nxpos = self.X[I]
-        self.nypos = self.Y[I]
-        self.nzpos = self.usurf[I]
+        I = (self.thk > 10) & (self.smb > -2) & self.gridseed # seed where thk>10, smb>-2, on a coarse grid
+        self.nxpos  = self.X[I]
+        self.nypos  = self.Y[I]
+        self.nzpos  = self.usurf[I]
         self.nrhpos = tf.ones_like(self.X[I])
-        self.nwpos = tf.ones_like(self.X[I])
+        self.nwpos  = tf.ones_like(self.X[I])
 
     def update_particles(self):
         """
-        IGM includes a particle tracking routine, which can compute a large number of trajectories (as it is implemented with TensorFlow to run in parallel) in live time during the forward model run. The routine produces some seeding of particles (by default in the accumulation area at regular intervals), and computes the time trajectory of the resulting particle in time advected by the velocity field in 3D. Horizontal and vertical directions are treated differently:
+        IGM includes a particle tracking routine, which can compute a large number of trajectories (as it is implemented with TensorFlow to run in parallel) in live time during the forward model run. The routine produces some seeding of particles (by default in the accumulation area at regular intervals), and computes the time trajectory of the resulting particle in time advected by the velocity field in 3D. There are currently 2 implementations:
+            
+        * 'simple', Horizontal and vertical directions are treated differently: i) In the horizontal plan, particles are advected with the horizontal velocity field (interpolated bi-linearly). The positions are recorded in vector (glacier.xpos,glacier.ypos). ii) In the vertical direction, particles are tracked along the ice column scaled between 0 and 1 (0 at the bed, 1 at the top surface). The relative position along the ice column is recorded in vector glacier.rhpos (same dimension as glacier.xpos and iglaciergm.ypos). Particles are always initialized at 1 (assumed to be on the surface). The evolution of the particle within the ice column through time is computed according to the surface mass balance: the particle deepens when the surface mass balance is positive (then igm.rhpos decreases), and re-emerge when the surface mass balance is negative.  
+    
+        * '3d', The vertical velocity is reconsructed by integrating the divergence of the horizontal velocity, this permits in turn to perform 3D particle tracking. self.zpos is the z- position within the ice.
         
-        * In the horizontal plan, particles are advected with the horizontal velocity field (interpolated bi-linearly). The positions are recorded in vector (glacier.xpos,glacier.ypos).
-        
-        * In the vertical direction, particles are tracked along the ice column scaled between 0 and 1 (0 at the bed, 1 at the top surface). The relative position along the ice column is recorded in vector glacier.rhpos (same dimension as glacier.xpos and iglaciergm.ypos). Particles are always initialized at 1 (assumed to be on the surface). The evolution of the particle within the ice column through time is computed according to the surface mass balance: the particle deepens when the surface mass balance is positive (then igm.rhpos decreases), and re-emerge when the surface mass balance is negative.  
+        Note that in both case, the velocity in the ice layer is reconstructed from bottom and surface one assuming 4rth order polynomial profile (SIA-like)
         
         To include this feature, make sure:
-        
-        * To activate it: glacier.config.tracking_particles=True
         
         * To adapt the seeding to your need. You may keep the default seeding in the accumulation area setting the seeding frequency with igm.config.frequency_seeding and the seeding density glacier.config.density_seeding. Alternatively, you may define your own seeding strategy (e.g. seeding close to rock walls/nunataks). To do so, you may redefine the function seeding_particles.
         
@@ -1351,17 +1367,20 @@ class Igm:
             self.ypos = tf.Variable([])
             self.zpos = tf.Variable([])
             self.rhpos = tf.Variable([])
-            self.wpos = tf.Variable([])
+            self.wpos = tf.Variable([]) # this is to give a weight to the particle
 
             # build the gridseed
             self.gridseed = np.zeros_like(self.thk) == 1
             rr = int(1.0 / self.config.density_seeding)
             self.gridseed[::rr, ::rr] = True
 
+            # create trajectory folder to store outputs
             directory = os.path.join(self.config.working_dir, "trajectories")
             if os.path.exists(directory):
                 shutil.rmtree(directory)
             os.mkdir(directory)
+            
+            os.system('echo rm -r '+ os.path.join(self.config.working_dir, "trajectories") + ' >> clean.sh')
   
         if (self.t.numpy() - self.tlast_seeding) >= self.config.frequency_seeding:
             self.seeding_particles()
@@ -1488,18 +1507,21 @@ class Igm:
             
 #           print('at the surface? : ',all(self.zpos == topg+othk))
 
+            # make sure the particle remian withi the ice body
             self.zpos.assign( tf.clip_by_value( self.zpos , topg, topg+othk) )
             
+            # get the relative height
             self.rhpos.assign( tf.where( othk > 0.1, (self.zpos - topg)/othk , 1 ) )
              
-            uvel = uvelbase + (uvelsurf - uvelbase) * ( 1 - (1 - self.rhpos) ** 4)
-            vvel = vvelbase + (vvelsurf - vvelbase) * ( 1 - (1 - self.rhpos) ** 4)
-            wvel = wvelbase + (wvelsurf - wvelbase) * ( 1 - (1 - self.rhpos) ** 4)
+            uvel = uvelbase + (uvelsurf - uvelbase) * ( 1 - (1 - self.rhpos) ** 4)  # SIA-like
+            vvel = vvelbase + (vvelsurf - vvelbase) * ( 1 - (1 - self.rhpos) ** 4)  # SIA-like
+            wvel = wvelbase + (wvelsurf - wvelbase) * ( 1 - (1 - self.rhpos) ** 4)  # SIA-like
                
             self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
             self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler 
             self.zpos.assign(self.zpos + self.dt * wvel)  # forward euler 
             
+            # make sur the particle remains in the horiz. comp. domain
             self.xpos.assign(tf.clip_by_value(self.xpos,self.x[0],self.x[-1]))
             self.ypos.assign(tf.clip_by_value(self.ypos,self.y[0],self.y[-1]))
 
@@ -1511,13 +1533,14 @@ class Igm:
             axis=-1,
         )
         updates = tf.cast(tf.where(self.rhpos == 1, self.wpos, 0), dtype="float32")
+        
+        # this computes the sum of the weight of particles on a 2D grid
         self.weight_particles = tf.tensor_scatter_nd_add(
             tf.zeros_like(self.thk), indices, updates
         )
 
         self.tcomp["Tracking"][-1] -= time.time()
         self.tcomp["Tracking"][-1] *= -1
-            
             
     def update_write_trajectories(self):
 
@@ -1542,32 +1565,31 @@ class Igm:
             ftt = os.path.join(self.config.working_dir, "trajectories", 'usurf-'+str(self.itime_write_trajectories)+'.csv') 
             array = tf.transpose(tf.stack([self.X[self.X>1],self.Y[self.X>1],self.usurf[self.X>1]]))
             np.savetxt(ftt, array , delimiter=',', fmt="%.2f", header='x,y,z')
-            
 
-    def update_write_trajectories_old(self):
+    # def update_write_trajectories_old(self):
 
-        if self.saveresult:
+    #     if self.saveresult:
 
-            ft = os.path.join(self.config.working_dir, "trajectories", 't.dat')
-            fx = os.path.join(self.config.working_dir, "trajectories", 'x.dat')
-            fy = os.path.join(self.config.working_dir, "trajectories", 'y.dat')
-            fz = os.path.join(self.config.working_dir, "trajectories", 'z.dat')
-            fr = os.path.join(self.config.working_dir, "trajectories", 'r.dat')                        
+    #         ft = os.path.join(self.config.working_dir, "trajectories", 't.dat')
+    #         fx = os.path.join(self.config.working_dir, "trajectories", 'x.dat')
+    #         fy = os.path.join(self.config.working_dir, "trajectories", 'y.dat')
+    #         fz = os.path.join(self.config.working_dir, "trajectories", 'z.dat')
+    #         fr = os.path.join(self.config.working_dir, "trajectories", 'r.dat')                        
 
-            with open(ft, "a") as f:
-                print(self.t.numpy(), file=f )    
+    #         with open(ft, "a") as f:
+    #             print(self.t.numpy(), file=f )    
                 
-            with open(fx, "a") as f:
-                print(*list(self.xpos.numpy()), file=f )      
+    #         with open(fx, "a") as f:
+    #             print(*list(self.xpos.numpy()), file=f )      
  
-            with open(fy, "a") as f:
-                print(*list(self.ypos.numpy()), file=f )    
+    #         with open(fy, "a") as f:
+    #             print(*list(self.ypos.numpy()), file=f )    
                 
-            with open(fz, "a") as f:
-                print(*list(self.zpos.numpy()), file=f )    
+    #         with open(fz, "a") as f:
+    #             print(*list(self.zpos.numpy()), file=f )    
                 
-            with open(fr, "a") as f:
-                print(*list(self.rhpos.numpy()), file=f )  
+    #         with open(fr, "a") as f:
+    #             print(*list(self.rhpos.numpy()), file=f )  
 
     ####################################################################################
     ####################################################################################
@@ -1578,13 +1600,6 @@ class Igm:
     ####################################################################################
 
     def read_config_param_3dvel(self):
-
-        self.parser.add_argument(
-            "--vel3d_active",
-            type=int,
-            default=False,
-            help="Is the computational of the 3D vel active?",
-        )
 
         self.parser.add_argument(
             "--dz",
@@ -1599,34 +1614,32 @@ class Igm:
 
     def init_3dvel(self):
 
-        if self.config.vel3d_active:
+        self.height = np.arange(
+            0, self.config.maxthk + 1, self.config.dz
+        )  # height with constant dz
+        self.ddz = self.height[1:] - self.height[:-1]
 
-            self.height = np.arange(
-                0, self.config.maxthk + 1, self.config.dz
-            )  # height with constant dz
-            self.ddz = self.height[1:] - self.height[:-1]
-
-            self.nz = tf.Variable(
-                tf.zeros((self.thk.shape[0], self.thk.shape[1]), dtype="int32")
+        self.nz = tf.Variable(
+            tf.zeros((self.thk.shape[0], self.thk.shape[1]), dtype="int32")
+        )
+        self.depth = tf.Variable(
+            tf.zeros(
+                (self.height.shape[0], self.thk.shape[0], self.thk.shape[1]),
+                dtype="float32",
             )
-            self.depth = tf.Variable(
-                tf.zeros(
-                    (self.height.shape[0], self.thk.shape[0], self.thk.shape[1]),
-                    dtype="float32",
-                )
+        )
+        self.dz = tf.Variable(
+            tf.zeros(
+                (self.height.shape[0] - 1, self.thk.shape[0], self.thk.shape[1]),
+                dtype="float32",
             )
-            self.dz = tf.Variable(
-                tf.zeros(
-                    (self.height.shape[0] - 1, self.thk.shape[0], self.thk.shape[1]),
-                    dtype="float32",
-                )
-            )
+        )
 
-            self.U = tf.Variable(tf.zeros_like(self.depth))  # x-vel component
-            self.V = tf.Variable(tf.zeros_like(self.depth))  # y-vel component
-            self.W = tf.Variable(tf.zeros_like(self.depth))  # z-vel component
+        self.U = tf.Variable(tf.zeros_like(self.depth))  # x-vel component
+        self.V = tf.Variable(tf.zeros_like(self.depth))  # y-vel component
+        self.W = tf.Variable(tf.zeros_like(self.depth))  # z-vel component
 
-            self.tcomp["3d Vel"] = []
+        self.tcomp["3d Vel"] = []
 
     @tf.function()
     def update_vert_disc_tf(self):
@@ -1720,28 +1733,26 @@ class Igm:
 
     def update_3dvel(self):
 
-        if self.config.vel3d_active:
+        if self.config.verbosity == 1:
+            print("update_3dvel ")
 
-            if self.config.verbosity == 1:
-                print("update_3dvel ")
+        self.tcomp["3d Vel"].append(time.time())
 
-            self.tcomp["3d Vel"].append(time.time())
+        self.update_vert_disc_tf()
 
-            self.update_vert_disc_tf()
+        self.update_reconstruct_3dvel_tf()
 
-            self.update_reconstruct_3dvel_tf()
+        self.update_ncdf_3d_ex()
 
-            self.update_ncdf_3d_ex()
+        self.tcomp["3d Vel"][-1] -= time.time()
+        self.tcomp["3d Vel"][-1] *= -1
 
-            self.tcomp["3d Vel"][-1] -= time.time()
-            self.tcomp["3d Vel"][-1] *= -1
-
-    def update_ncdf_3d_ex(self, force=False):
+    def update_ncdf_3d_ex(self):
         """
         Initialize  and write the ncdf output file
         """
 
-        if force | self.saveresult:
+        if self.saveresult:
 
             if self.it == 0:
 
@@ -2740,6 +2751,12 @@ class Igm:
             fmt="%.3f",
         )
 
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "strflowctrl.dat") + ' >> clean.sh')        
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "rms_std.dat") + ' >> clean.sh')        
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "costs.dat") + ' >> clean.sh')
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "volume.dat") + ' >> clean.sh')
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "tcompoptimize.dat") + ' >> clean.sh')
+
     def run_opti(self):
 
         self.initialize()
@@ -2866,21 +2883,21 @@ class Igm:
             )
 
             nc.createDimension("iterations", None)
-            E = nc.createVariable("iterations", dtype("float32").char, ("iterations",))
+            E = nc.createVariable("iterations", np.dtype("float32").char, ("iterations",))
             E.units = "None"
             E.long_name = "iterations"
             E.axis = "ITERATIONS"
             E[0] = it
 
             nc.createDimension("y", len(self.y))
-            E = nc.createVariable("y", dtype("float32").char, ("y",))
+            E = nc.createVariable("y", np.dtype("float32").char, ("y",))
             E.units = "m"
             E.long_name = "y"
             E.axis = "Y"
             E[:] = self.y.numpy()
 
             nc.createDimension("x", len(self.x))
-            E = nc.createVariable("x", dtype("float32").char, ("x",))
+            E = nc.createVariable("x", np.dtype("float32").char, ("x",))
             E.units = "m"
             E.long_name = "x"
             E.axis = "X"
@@ -2889,13 +2906,13 @@ class Igm:
             for var in self.config.opti_vars_to_save:
 
                 E = nc.createVariable(
-                    var, dtype("float32").char, ("iterations", "y", "x")
+                    var, np.dtype("float32").char, ("iterations", "y", "x")
                 )
-                # E.long_name = self.var_info[var][0]
-                # E.units = self.var_info[var][1]
                 E[0, :, :] = vars(self)[var].numpy()
 
             nc.close()
+            
+            os.system('echo rm '+ os.path.join(self.config.working_dir, "optimize.nc") + ' >> clean.sh')
 
         else:
 
@@ -2966,14 +2983,14 @@ class Igm:
         )
 
         nc.createDimension("y", len(self.y))
-        E = nc.createVariable("y", dtype("float32").char, ("y",))
+        E = nc.createVariable("y", np.dtype("float32").char, ("y",))
         E.units = "m"
         E.long_name = "y"
         E.axis = "Y"
         E[:] = self.y.numpy()
 
         nc.createDimension("x", len(self.x))
-        E = nc.createVariable("x", dtype("float32").char, ("x",))
+        E = nc.createVariable("x", np.dtype("float32").char, ("x",))
         E.units = "m"
         E.long_name = "x"
         E.axis = "X"
@@ -2982,12 +2999,14 @@ class Igm:
         for var in varori:
 
             if hasattr(self, var):
-                E = nc.createVariable(var, dtype("float32").char, ("y", "x"))
+                E = nc.createVariable(var, np.dtype("float32").char, ("y", "x"))
                 #                E.long_name = self.var_info[var][0]
                 #                E.units     = self.var_info[var][1]
                 E[:, :] = vars(self)[var].numpy()
 
         nc.close()
+        
+        os.system('echo rm '+ os.path.join(self.config.working_dir, self.config.geology_optimized_file) + ' >> clean.sh')
 
     def plot_cost_functions(self, costs, plot_live):
 
@@ -3014,6 +3033,8 @@ class Igm:
                 os.path.join(self.config.working_dir, "convergence.png"), pad_inches=0
             )
             plt.close("all")
+            
+            os.system('echo rm '+ os.path.join(self.config.working_dir, "convergence.png") + ' >> clean.sh')
 
     def update_plot_inversion(self, i, plot_live):
         """
@@ -3140,6 +3161,8 @@ class Igm:
                     pad_inches=0,
                 )
                 plt.close("all")
+                
+                os.system('echo rm '+ os.path.join(self.config.working_dir, "*.png") + ' >> clean.sh')
 
     def plot_opti_diff(self, file, vari, plot_live=True):
         """
@@ -3269,6 +3292,8 @@ class Igm:
                 pad_inches=0,
             )
             plt.close("all")
+            
+            os.system('echo rm '+ os.path.join(self.config.working_dir, "*.png") + ' >> clean.sh')
 
     def update_plot_profiles(self, i, plot_live):
 
@@ -3301,6 +3326,8 @@ class Igm:
                 pad_inches=0,
             )
             plt.close("all")
+            
+            os.system('echo rm '+ os.path.join(self.config.working_dir, "*.png") + ' >> clean.sh')
 
     ####################################################################################
     ####################################################################################
@@ -3325,12 +3352,14 @@ class Igm:
             help="maximum value of the varplot variable used to adjust the scaling of the colorbar",
         )
 
-    def update_plot(self, force=False):
+    def update_plot(self):
         """
-        Plot thickness, velocity, mass balance
+        Plot some variables (e.g. thickness, velocity, mass balance) over time
         """
 
-        if force | (self.saveresult & self.config.plot_result):
+        if (self.saveresult & self.config.plot_result):
+            
+            from IPython.display import display, clear_output
             
             self.extent = [np.min(self.x),np.max(self.x),np.min(self.y),np.max(self.y)]
 
@@ -3410,6 +3439,8 @@ class Igm:
                     bbox_inches="tight",
                     pad_inches=0.2,
                 )
+                
+                os.system('echo rm '+ os.path.join(self.config.working_dir, "*.png") + ' >> clean.sh')
 
             self.tcomp["Outputs plot"][-1] -= time.time()
             self.tcomp["Outputs plot"][-1] *= -1
@@ -3455,8 +3486,15 @@ class Igm:
             os.path.join(self.config.working_dir, "PIE-COMPUTATIONAL.png"), pad_inches=0
         )
         plt.close("all")
+        
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "PIE-COMPUTATIONAL.png") + ' >> clean.sh')
 
     def animate_result(self, file, vari, save=False):
+        """
+        This function can be called at the end of an IGM run, it permits
+        to create an video animation in mp4 by readin the ex.nc ncdf file,
+        for a given variable 'vari'
+        """
 
         from IPython.display import HTML, display
         import xarray as xr
@@ -3505,6 +3543,8 @@ class Igm:
         # optionally the animation can be saved in avi
         if save:
             ani.save(file.split(".")[0] + "-" + vari + ".mp4")
+            
+            os.system('echo rm '+ os.path.join(self.config.working_dir, "*.mp4") + ' >> clean.sh')
 
     ####################################################################################
     ####################################################################################
@@ -3572,6 +3612,8 @@ class Igm:
                     "     %15s  |  mean time per it : %8.4f  |  total : %8.4f  |  number it  : %8.0f"
                     % CELA
                 )
+                
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "computational-statistics.txt") + ' >> clean.sh')
 
     ####################################################################################
     ####################################################################################
@@ -3582,52 +3624,62 @@ class Igm:
     ####################################################################################
 
     def run(self):
+        """
+        This function wraps the full time-iterative scheme for an IGM forward run
+        with an optional inverse step.
+        """
 
+        # initilize class Igm
         self.initialize()
 
+        # decide what computation device to use (CPU or GPU)
         with tf.device(self.device_name):
 
+            # load geological data (e.g. topography)
             self.load_ncdf_data(self.config.geology_file)
-
+ 
+            # initialize all 2D field needed in the following
             self.initialize_fields()
 
+            # if a restarting file exist, then load the data from it
             if len(self.config.restartingfile) > 0:
                 self.restart(-1)
 
+            # does the inverse modelling/data assimilation if requested
             if self.config.optimize:
                 self.optimize()
 
+            # time loop, with all steps
             while self.t.numpy() < self.config.tend:
 
                 self.tcomp["All"].append(time.time())
 
-                self.update_climate()
+                self.update_climate() # update climate
+ 
+                self.update_smb() # update surface mass balance
 
-                self.update_smb()
+                self.update_iceflow() # update ice flow
 
-                self.update_iceflow()
+                # self.update_particles() # update computation of particles
 
-                if self.config.tracking_particles:
-                    self.update_particles()
+                self.update_t_dt() # update time, and time step
 
-                self.update_t_dt()
+                self.update_thk() # update ice thickness (mass conservation)
 
-                self.update_thk()
+                self.update_topg() # update basal surface topography
 
-                self.update_topg()
+                self.update_ncdf_ex() # update ex.nc output file
 
-                self.update_ncdf_ex()
+                self.update_ncdf_ts() # update ts.nc output file
 
-                self.update_ncdf_ts()
+                self.update_plot()  # update output plot
 
-                self.update_plot()
-
-                self.print_info()
+                self.print_info()  # print information on the run
 
                 self.tcomp["All"][-1] -= time.time()
                 self.tcomp["All"][-1] *= -1
 
-        self.print_all_comp_info()
+        self.print_all_comp_info() # Print information related to computational efficiency
 
 ####################################################################################
 ####################################################################################

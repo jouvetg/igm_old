@@ -12,4 +12,6 @@
 
 - mer-de-glace gives a combined example of inverse and forward modelling for the Mer de Glace Glacier in France.
 
+- synthetic gives an example of synthetic glacier with a stationary mass balance, it also include particle tracking.
+
 

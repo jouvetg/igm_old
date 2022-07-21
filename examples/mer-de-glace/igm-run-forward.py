@@ -43,7 +43,7 @@ glacier.config.plot_live             = False
 glacier.config.varplot_max           = 250 
 
 # This permits to compute particle trajectories
-glacier.config.tracking_particles      = False  # activate particle tracking
+tracking_particles                     = False  # activate particle tracking
 glacier.config.frequency_seeding       = 20    # we seed every 10 years
 glacier.config.density_seeding         = 0.2   # we seed each 5 point of the 2D grid
 
@@ -56,7 +56,7 @@ with tf.device(glacier.device_name):
     while glacier.t < glacier.config.tend:                       
         glacier.update_smb()
         glacier.update_iceflow()
-        if glacier.config.tracking_particles:
+        if tracking_particles:
              glacier.update_particles()
         glacier.update_t_dt() 
         glacier.update_thk()       
