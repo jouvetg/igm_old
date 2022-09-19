@@ -43,7 +43,7 @@ glacier.config.plot_live             = True
 glacier.config.varplot_max           = 250 
 
 # This permits to compute particle trajectories 
-glacier.config.tracking_method         ='simple'
+glacier.config.tracking_method         ='3d'
 glacier.config.frequency_seeding       = 1000    # we seed every 10 years
 glacier.config.density_seeding         = 0.1   # we seed each 5 point of the 2D grid
  

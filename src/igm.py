@@ -323,6 +323,9 @@ class Igm:
         # define cell spacing
         self.dx = self.x[1] - self.x[0]
 
+        # define dX
+        self.dX = tf.ones_like(self.thk) * self.dx
+
         # compiute surface gradient
         self.slopsurfx, self.slopsurfy = self.compute_gradient_tf(
             self.usurf, self.dx, self.dx
