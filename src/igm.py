@@ -1651,7 +1651,7 @@ class Igm:
         self.parser.add_argument(
             "--smoothing_thk_update_freq",
             type=float,
-            default=1000,
+            default=100,
             help="Update the smoothing thk only each X years (Default: 1)",
         )
  
