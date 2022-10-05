@@ -39,6 +39,31 @@ from scipy import stats
 def str2bool(v):
     return v.lower() in ("true", "1")
 
+# @tf.keras.utils.register_keras_serializable()
+# class StackGlen(tf.keras.layers.Layer):
+    
+#     def __init__(self,nb_outputs,**kwargs):
+#         super(StackGlen, self).__init__()
+#         self.nb_outputs = nb_outputs
+        
+#     def get_config(self):
+#         config = super().get_config().copy()
+#         config.update({"nb_outputs": self.nb_outputs})
+#         return config
+ 
+#     def call(self, inputs):
+          
+#         U = inputs[:,:,:,:int(self.nb_outputs/2)]
+#         V = inputs[:,:,:,int(self.nb_outputs/2):]
+#         uvelbase = U[:, :, :, 0]
+#         vvelbase = V[:, :, :, 0]
+#         ubar     = tf.reduce_mean(U, axis=-1) 
+#         vbar     = tf.reduce_mean(V, axis=-1)
+#         uvelsurf = U[:, :, :, -1]
+#         vvelsurf = V[:, :, :, -1]
+
+#         return tf.stack([uvelbase,vvelbase,ubar,vbar,uvelsurf,vvelsurf],axis=-1)
+
 ####################################################################################
 
 class Igm:
@@ -661,27 +686,19 @@ class Igm:
         compute spatial 2D gradient of a given field
         """
 
-        EX = tf.concat([s[:, 0:1], 0.5 * (s[:, :-1] + s[:, 1:]), s[:, -1:]], 1)
+        # EX = tf.concat([s[:, 0:1], 0.5 * (s[:, :-1] + s[:, 1:]), s[:, -1:]], 1)
+        # diffx = (EX[:, 1:] - EX[:, :-1]) / dx
+
+        # EY = tf.concat([s[0:1, :], 0.5 * (s[:-1, :] + s[1:, :]), s[-1:, :]], 0)
+        # diffy = (EY[1:, :] - EY[:-1, :]) / dy
+        
+        EX = tf.concat([ 1.5*s[:,0:1] - 0.5*s[:,1:2], 0.5*s[:,:-1] + 0.5*s[:,1:], 1.5*s[:,-1:] - 0.5*s[:,-2:-1] ], 1)
         diffx = (EX[:, 1:] - EX[:, :-1]) / dx
 
-        EY = tf.concat([s[0:1, :], 0.5 * (s[:-1, :] + s[1:, :]), s[-1:, :]], 0)
+        EY = tf.concat([ 1.5*s[0:1,:] - 0.5*s[1:2,:], 0.5*s[:-1,:] + 0.5*s[1:,:], 1.5*s[-1:,:] - 0.5*s[-2:-1,:] ], 0)
         diffy = (EY[1:, :] - EY[:-1, :]) / dy
 
         return diffx, diffy
-
-    # @tf.function()
-    # def compute_gradient_tf(self, s, dx, dy):
-    #     """
-    #     compute spatial 2D gradient of a given field
-    #     """
-        
-    #     EX = tf.pad(s, [[0, 0], [1, 1]], "SYMMETRIC") 
-    #     EY = tf.pad(s, [[1, 1], [0, 0]], "SYMMETRIC") 
-
-    #     diffx = (EX[:, 2:] - EX[:, :-2]) / (2*dx)
-    #     diffy = (EY[2:, :] - EY[:-2, :]) / (2*dy)
-
-    #     return diffx, diffy
 
     ####################################################################################
     ####################################################################################
@@ -744,7 +761,8 @@ class Igm:
 
         dirpath = os.path.join(self.config.iceflow_model_lib_path, str(int(self.dx)))
 
-        assert os.path.isdir(dirpath)
+        if not os.path.isdir(dirpath):
+            dirpath = self.config.iceflow_model_lib_path
 
         # fieldin, fieldout, fieldbounds contains name of I/O variables, and bounds for scaling
         fieldin, fieldout, fieldbounds = self.read_fields_and_bounds(dirpath)
@@ -1607,6 +1625,55 @@ class Igm:
                 
     #         with open(fr, "a") as f:
     #             print(*list(self.rhpos.numpy()), file=f )  
+    
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+    #                               THK SMOOTHING
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+    
+    def read_config_param_smoothing_thk(self):
+
+        self.parser.add_argument(
+            "--smoothing_thk_filter_shape",
+            type=int,
+            default=3,
+            help="smoothing_thk_filter_shape",
+        )
+        self.parser.add_argument(
+            "--smoothing_thk_sigma",
+            type=float,
+            default=3,
+            help="smoothing_thk_sigma",
+        )
+        self.parser.add_argument(
+            "--smoothing_thk_update_freq",
+            type=float,
+            default=1000,
+            help="Update the smoothing thk only each X years (Default: 1)",
+        )
+ 
+    def update_smoothing_thk(self):
+        """
+        This function permits to smooth the ice thickness at some intervals
+        """
+
+        if not hasattr(self, "already_called_smoothing_thk"):
+            self.tlast_smoothing_thk         = -1.0e5000  
+            self.already_called_smoothing_thk = True
+            
+        if ((self.t.numpy() - self.tlast_smoothing_thk) >= self.config.smoothing_thk_update_freq):
+         
+                import tensorflow_addons as tfa
+                 
+                self.thk.assign( tfa.image.gaussian_filter2d(self.thk, 
+                                                       sigma=self.config.smoothing_thk_sigma, 
+                                                       filter_shape=self.config.smoothing_thk_filter_shape,
+                                                       padding="CONSTANT") )
+                
+                self.tlast_smoothing_thk = self.t.numpy()
 
     ####################################################################################
     ####################################################################################
