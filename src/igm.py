@@ -833,7 +833,8 @@ class Igm:
         )
 
         # Get the ice flow after applying the NN
-        Y = self.iceflow_model.predict_on_batch(X)
+#        Y = self.iceflow_model.predict_on_batch(X)
+        Y = self.iceflow_model(X)
 
         # Appplying scaling, and update variables
         Ny, Nx = self.thk.shape
