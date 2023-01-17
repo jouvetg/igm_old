@@ -587,6 +587,61 @@ class Igm:
                 for var in ["vol", "area"]:
                     nc.variables[var][d] = vars()[var].numpy()
                 nc.close()
+                
+    def load_tif_data(self,variables):
+        """
+        Load the input files from tiff file (alternative to load_ncdf_data)
+        Select available fields in variables
+        you need at least topg or usurf, and thk,
+        filed e.g. topg.tif, thk.tif must be present in the working forlder
+        you need rasterio to play this function
+        """
+        
+        import rasterio 
+        
+        for var in variables:
+            file = os.path.join(self.config.working_dir,var+'.tif')
+            if os.path.exists(file):
+                with rasterio.open(file) as src:    
+                    vars()[var] = np.flipud(src.read(1))
+                    height      = vars()[var].shape[0]
+                    width       = vars()[var].shape[1]
+                    cols, rows  = np.meshgrid(np.arange(width), np.arange(height))
+                    x, y = rasterio.transform.xy(src.transform, rows, cols)
+                    x = np.array(x)[0,:]
+                    y = np.flip(np.array(y)[:,0])                  
+                    vars(self)[var] = tf.Variable(vars()[var].astype("float32"))
+                del src
+ 
+        self.x = tf.constant(x.astype("float32"))
+        self.y = tf.constant(y.astype("float32"))
+ 
+    def update_tif_ex(self,variables):
+        """
+        Save variables in tiff file (alternative to update_ncdf_ex)
+        Select available fields in variables, e.g. topg, usurf, ...
+        Files will be created with names like thk-000040.tif in the workin direc.
+        you need rasterio to play this function
+        """
+        
+        import rasterio
+        
+        if self.saveresult:
+            
+            xres = (self.x[-1] - self.x[0]) / len(self.x)
+            yres = (self.y[-1] - self.y[0]) / len(self.y)
+            transform = rasterio.Affine.translation(self.x[0] - xres / 2, self.y[0] - yres / 2) \
+                      * rasterio.Affine.scale(xres, yres)
+
+            for var in variables:
+                file = os.path.join(self.config.working_dir,var+'-'+str(int(self.t)).zfill(6)+'.tif')
+                with rasterio.open(file,
+                         mode="w", driver="GTiff",
+                         height=vars(self)[var].shape[0], 
+                         width=vars(self)[var].shape[1],
+                         count=1, dtype=np.float32, transform=transform,) as src:
+                             src.write(vars(self)[var], 1)
+                del src
 
     ####################################################################################
     ####################################################################################
