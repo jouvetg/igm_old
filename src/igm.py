@@ -1149,9 +1149,6 @@ class Igm:
             else:
                 self.smb.assign(tf.zeros_like(self.topg))
 
-            if hasattr(self, "icemask"):
-                self.smb.assign(self.smb * self.icemask)
-
             if not self.config.mb_scaling == 1:
                 self.smb.assign(self.smb * self.config.mb_scaling)
 
