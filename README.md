@@ -2,6 +2,10 @@
 [![CI badge](https://github.com/AdrienWehrle/earthspy/workflows/CI/badge.svg)](https://github.com/AdrienWehrle/igm/actions)
 ### <h1 align="center" id="title">The Instructed Glacier Model (IGM)</h1>
 
+# Open positions
+
+We have 1 PhD and 1 postdoc open position in glacier and landscape evolution modelling at the University of Lausanne (UNIL), Switzerland. The two positions involve model developments of IGM, and applications to paleo glacier evolution in the Alps. For more information, please visit [this page](https://wp.unil.ch/ice/open-positions/).
+
 # Notice 
 
 IGM is a very young model, continuously developped, with limited documentation and testing. To start with, I recomand to start with examples (via colab notebooks or the example folder). If you have ideas of extensions or applications, you would like to contribute, please contact me at guillaume.jouvet at unil.ch.

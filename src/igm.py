@@ -384,6 +384,7 @@ class Igm:
         self.var_info["vol"] = ["Ice volume", "km^3"]
         self.var_info["area"] = ["Glaciated area", "km^2"]
         self.var_info["velsurfobs_mag"] = ["Obs. surf. speed of ice","m/y"]
+        self.var_info["weight_particles"] = ["weight_particles","no"]
 
     def restart(self):
         """
@@ -1636,21 +1637,19 @@ class Igm:
             
             if not hasattr(self, "already_called_update_write_trajectories"):
                 self.already_called_update_write_trajectories = True
-                self.itime_write_trajectories = 0 
                 ftt = os.path.join(self.config.working_dir, "trajectories", 'topg.csv') 
                 array = tf.transpose(tf.stack([self.X[self.X>0],self.Y[self.X>0],self.topg[self.X>0]]))
                 np.savetxt(ftt, array , delimiter=',', fmt="%.2f", header='x,y,z')
              
-            f = os.path.join(self.config.working_dir, "trajectories", 'traj-'+str(self.itime_write_trajectories)+'.csv') 
+            f = os.path.join(self.config.working_dir, "trajectories", 'traj-'+'{:06d}'.format(int(self.t.numpy()))+'.csv') 
             ft = os.path.join(self.config.working_dir, "trajectories", 'time.dat') 
             ID = tf.cast(tf.range(self.xpos.shape[0]),dtype='float32')
             array = tf.transpose(tf.stack([ID,self.xpos,self.ypos,self.zpos,self.rhpos],axis=0))
             np.savetxt(f, array , delimiter=',', fmt="%.2f", header='Id,x,y,z,rh')
-            self.itime_write_trajectories += 1
             with open(ft, "a") as f:
                 print(self.t.numpy(), file=f )  
                 
-            ftt = os.path.join(self.config.working_dir, "trajectories", 'usurf-'+str(self.itime_write_trajectories)+'.csv') 
+            ftt = os.path.join(self.config.working_dir, "trajectories", 'usurf-'+'{:06d}'.format(int(self.t.numpy()))+'.csv') 
             array = tf.transpose(tf.stack([self.X[self.X>1],self.Y[self.X>1],self.usurf[self.X>1]]))
             np.savetxt(ftt, array , delimiter=',', fmt="%.2f", header='x,y,z')
 
@@ -3517,7 +3516,7 @@ class Igm:
                 self.ax = self.fig.add_subplot(1, 1, 1)
                 self.ax.axis("off")
                 im = self.ax.imshow(
-                    vars(self)[self.config.varplot],
+                    tf.where(self.thk>1,vars(self)[self.config.varplot],np.nan),
                     origin="lower",
                     cmap="viridis",
                     vmin=0,
@@ -3534,12 +3533,12 @@ class Igm:
                     cmap="RdBu",
                 )
                 self.ax.set_title("YEAR : " + str(self.t.numpy()), size=15)
-                self.cbar = plt.colorbar(im)
+                self.cbar = plt.colorbar(im,label=self.config.varplot)
 #                self.ax.set_xlim(427500, 430000)
 #                self.ax.set_ylim(5142250,5147050)
             else:
                 im = self.ax.imshow(
-                    vars(self)[self.config.varplot],
+                    tf.where(self.thk>1,vars(self)[self.config.varplot],np.nan),
                     origin="lower",
                     cmap="viridis",
                     vmin=0,
