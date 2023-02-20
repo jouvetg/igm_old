@@ -11,13 +11,11 @@ from pyproj import Transformer
 import scipy
 import json
 
-
 def str2bool(v):
     return v.lower() in ("true", "1")
 
-
 parser = argparse.ArgumentParser(
-    description="This script uses OGGM utilities to prepare data \
+    description="This script uses OGGM utilities and GlaThiDa dataset to prepare data \
                                  for the IGM model for a specific glacier given the RGI ID. \
                                  The user must provides RGI ID \
                                  (check GLIMS VIeWER : https://www.glims.org/maps/glims) \
