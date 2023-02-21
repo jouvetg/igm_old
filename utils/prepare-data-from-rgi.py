@@ -189,9 +189,8 @@ def read_GlaThiDa(x, y, usurf, proj):
     if not os.path.exists("glathida"):
         os.system("git clone https://gitlab.com/wgms/glathida")
 
-    files = []
-    files.append("glathida/data/point.csv")
-    files.append("glathida/submissions/swiss-glacier-thickness-r2020/point.csv")
+    files = ["glathida/data/point.csv"]
+    files += glob.glob("glathida/submissions/*/point.csv")
 
     transformer = Transformer.from_crs(proj, "epsg:4326", always_xy=True)
 
