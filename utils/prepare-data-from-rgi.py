@@ -181,9 +181,7 @@ def read_GlaThiDa(x, y, usurf, proj):
 
     print("read_GlaThiDa ----------------------------------")
 
-    import pyproj
-    from scipy.interpolate import interp1d, RectBivariateSpline
-    import csv
+    from scipy.interpolate import RectBivariateSpline
     import pandas as pd
 
     if not os.path.exists("glathida"):
