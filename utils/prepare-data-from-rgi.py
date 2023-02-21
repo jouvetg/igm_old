@@ -177,9 +177,9 @@ def oggm_util(RGIs, config, WD="OGGM-dir"):
 ######################################
 
 
-def read_GlaThiDa(x, y, usurf, proj):
+def read_glathida(x, y, usurf, proj):
 
-    print("read_GlaThiDa ----------------------------------")
+    print("read_glathida ----------------------------------")
 
     from scipy.interpolate import RectBivariateSpline
     import pandas as pd
@@ -280,7 +280,7 @@ for v in ["consensus_ice_thickness"]:
 ######################################################
 
 if config.observation:
-    thkobs = read_GlaThiDa(x, y, topo, proj)
+    thkobs = read_glathida(x, y, topo, proj)
     thkobs = np.where(glacier_mask, thkobs, np.nan)
 
 if config.thk_source == "millan2022":
