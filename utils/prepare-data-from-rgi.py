@@ -234,7 +234,7 @@ def read_glathida(x, y, usurf, proj):
         'col': np.floor(xx - np.min(x) / (x[1] - x[0])).astype(int),
         'row': np.floor(yy - np.min(y) / (y[1] - y[0])).astype(int),
         'thickness': thickness_normalized
-    }).groupby(['row', 'col'], as_index=False).mean()
+    }).groupby(['row', 'col'])['thickness'].mean()
     thkobs = np.full((y.shape[0], x.shape[0]), np.nan)
     thkobs[tuple(zip(*thickness_gridded.index))] = thickness_gridded
     return thkobs
