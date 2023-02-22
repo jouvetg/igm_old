@@ -177,21 +177,18 @@ def oggm_util(RGIs, config, WD="OGGM-dir"):
 ######################################
 
 
-def read_GlaThiDa(x, y, usurf, proj):
+def read_glathida(x, y, usurf, proj):
 
-    print("read_GlaThiDa ----------------------------------")
+    print("read_glathida ----------------------------------")
 
-    import pyproj
-    from scipy.interpolate import interp1d, RectBivariateSpline
-    import csv
+    from scipy.interpolate import RectBivariateSpline
     import pandas as pd
 
     if not os.path.exists("glathida"):
         os.system("git clone https://gitlab.com/wgms/glathida")
 
-    files = []
-    files.append("glathida/data/point.csv")
-    files.append("glathida/submissions/swiss-glacier-thickness-r2020/point.csv")
+    files = ["glathida/data/point.csv"]
+    files += glob.glob("glathida/submissions/*/point.csv")
 
     transformer = Transformer.from_crs(proj, "epsg:4326", always_xy=True)
 
@@ -200,67 +197,46 @@ def read_GlaThiDa(x, y, usurf, proj):
 
     transformer = Transformer.from_crs("epsg:4326", proj, always_xy=True)
 
-    profile = []
-
     print(x.shape, y.shape, usurf.shape)
 
     fsurf = RectBivariateSpline(x, y, np.transpose(usurf))
 
-    for file in files:
+    df = pd.concat(
+        [pd.read_csv(file) for file in files],
+        ignore_index=True
+    )
+    mask = (
+        (lonmin <= df["lon"])
+        & (df["lon"] <= lonmax)
+        & (latmin <= df["lat"])
+        & (df["lat"] <= latmax)
+        & df["elevation"].notnull()
+        & df["date"].notnull()
+        & df["elevation_date"].notnull()
+    )
+    df = df[mask]
 
-        print("READ : ", file)
+    # Filter by date gap in second step for speed
+    mask = (
+        df["date"].str.slice(0, 4).astype(int) -
+        df["elevation_date"].str.slice(0, 4).astype(int)
+    ).abs().le(1)
+    df = df[mask]
 
-        F = pd.read_csv(file)
+    # Compute thickness relative to prescribed surface
+    xx, yy = transformer.transform(df["lon"], df["lat"])
+    bedrock = df["elevation"] - df["thickness"]
+    elevation_normalized = fsurf(xx, yy, grid=False)
+    thickness_normalized = np.maximum(elevation_normalized - bedrock, 0)
 
-        I = (
-            (lonmin <= F["lon"])
-            & (F["lon"] <= lonmax)
-            & (latmin <= F["lat"])
-            & (F["lat"] <= latmax)
-        )
-
-        F = F[I]
-
-        for i, f in F.iterrows():
-
-            if isinstance(f["date"], str) & isinstance(f["elevation_date"], str):
-                if (
-                    abs(
-                        int(f["date"].split("-")[0])
-                        - int(f["elevation_date"].split("-")[0])
-                    )
-                    <= 1
-                ):
-                    xx, yy = transformer.transform(f["lon"], f["lat"])
-                    bedrock = f["elevation"] - f["thickness"]
-                    surf = fsurf(xx, yy)[0][0]
-                    thk_normalized = max(surf - bedrock, 0)
-                    profile.append(
-                        np.array(
-                            [int(f["survey_id"]), float(xx), float(yy), thk_normalized]
-                        )
-                    )
-
-    if len(profile) > 0:
-        profile = np.stack(profile)
-
-    nx = x.shape[0]
-    ny = y.shape[0]
-
-    thkobs = np.ones((ny, nx)) * np.nan
-
-    # This "rasterizes the profiles", this needs to be better implmented
-
-    for i in range(len(profile)):
-
-        [dummy, xx, yy, thk_n] = profile[i]
-
-        ii = int((xx - np.min(x)) / (x[1] - x[0]))
-        jj = int((yy - np.min(y)) / (y[1] - y[0]))
-
-        if (ii >= 0) & (ii < nx) & (jj >= 0) & (jj < ny):
-            thkobs[jj, ii] = thk_n
-
+    # Rasterize thickness
+    thickness_gridded = pd.DataFrame({
+        'col': np.floor(xx - np.min(x) / (x[1] - x[0])).astype(int),
+        'row': np.floor(yy - np.min(y) / (y[1] - y[0])).astype(int),
+        'thickness': thickness_normalized
+    }).groupby(['row', 'col'], as_index=False).mean()
+    thkobs = np.full((y.shape[0], x.shape[0]), np.nan)
+    thkobs[tuple(zip(*thickness_gridded.index))] = thickness_gridded
     return thkobs
 
 
@@ -304,7 +280,7 @@ for v in ["consensus_ice_thickness"]:
 ######################################################
 
 if config.observation:
-    thkobs = read_GlaThiDa(x, y, topo, proj)
+    thkobs = read_glathida(x, y, topo, proj)
     thkobs = np.where(glacier_mask, thkobs, np.nan)
 
 if config.thk_source == "millan2022":
