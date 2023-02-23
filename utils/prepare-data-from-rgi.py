@@ -31,7 +31,10 @@ parser = argparse.ArgumentParser(
                                  the RGI, and the ice thckness and velocity from (MIllan, 2022) \
                                  For the ice thickness in geology.nc, the use can choose \
                                  between farinotti2019 or millan2022 dataset \
-                                 Script written by G. Jouvet & F. Maussion"
+                                 When activating observation==True, ice thickness profiles are \
+                                 downloaded from the GlaThiDa depo (https://gitlab.com/wgms/glathida) \
+                                 and are rasterized on working grids \
+                                 Script written by G. Jouvet & F. Maussion & E. Welty"
 )
 
 parser.add_argument(
