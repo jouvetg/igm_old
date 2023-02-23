@@ -231,8 +231,8 @@ def read_glathida(x, y, usurf, proj):
 
     # Rasterize thickness
     thickness_gridded = pd.DataFrame({
-        'col': np.floor(xx - np.min(x) / (x[1] - x[0])).astype(int),
-        'row': np.floor(yy - np.min(y) / (y[1] - y[0])).astype(int),
+        'col': np.floor((xx - np.min(x)) / (x[1] - x[0])).astype(int),
+        'row': np.floor((yy - np.min(y)) / (y[1] - y[0])).astype(int),
         'thickness': thickness_normalized
     }).groupby(['row', 'col'])['thickness'].mean()
     thkobs = np.full((y.shape[0], x.shape[0]), np.nan)
