@@ -84,6 +84,13 @@ parser.add_argument(
     help="Name of the observation file",
 )
 
+parser.add_argument(
+    "--path_glathida",
+    type=str,
+    default="",
+    help="Path where the Glathida Folder is store, so that you don't need to redownload it at any use of the script",
+)
+
 config = parser.parse_args()
 
 
@@ -180,18 +187,20 @@ def oggm_util(RGIs, config, WD="OGGM-dir"):
 ######################################
 
 
-def read_glathida(x, y, usurf, proj):
+def read_glathida(x, y, usurf, proj, path_glathida):
 
     print("read_glathida ----------------------------------")
 
     from scipy.interpolate import RectBivariateSpline
     import pandas as pd
 
-    if not os.path.exists("glathida"):
-        os.system("git clone https://gitlab.com/wgms/glathida")
+    if not os.path.exists(os.path.join(path_glathida,"glathida")):
+        os.system("git clone https://gitlab.com/wgms/glathida "+path_glathida)
+    else:
+        print('glathida data already at '+path_glathida)
 
-    files = ["glathida/data/point.csv"]
-    files += glob.glob("glathida/submissions/*/point.csv")
+    files = [os.path.join(path_glathida,"glathida","data","point.csv")]
+    files += glob.glob(os.path.join(path_glathida,"glathida","submissions","*","point.csv"))
 
     transformer = Transformer.from_crs(proj, "epsg:4326", always_xy=True)
 
@@ -283,7 +292,7 @@ for v in ["consensus_ice_thickness"]:
 ######################################################
 
 if config.observation:
-    thkobs = read_glathida(x, y, topo, proj)
+    thkobs = read_glathida(x, y, topo, proj, config.path_glathida)
     thkobs = np.where(glacier_mask, thkobs, np.nan)
 
 if config.thk_source == "millan2022":
