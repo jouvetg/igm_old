@@ -2337,8 +2337,11 @@ class Igm:
             self.thk.assign(tf.zeros_like(self.thk))
 
         ###### PREPARE OPIMIZER
-
-        optimizer = tf.keras.optimizers.Adam(lr=self.config.opti_step_size)
+        
+        if int(tf.__version__.split('.')[1])<=10:
+            optimizer = tf.keras.optimizers.Adam(learning_rate=self.config.opti_step_size)
+        else:
+            optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=self.config.opti_step_size)
 
         # initial_learning_rate * decay_rate ^ (step / decay_steps)
         # lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay( initial_learning_rate=opti_step_size, decay_steps=100, decay_rate=0.9)
