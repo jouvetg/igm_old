@@ -187,6 +187,11 @@ class Igm:
             default=78, 
             help="Initial arrhenius factor arrhenuis (default: 78)",
         )
+        self.parser.add_argument(
+            "--version", 
+            type=str, default="v1", 
+            help="IGM version (v1 or v2)"
+        )
         
         # Read all parameters defined in function read_config_param_*
         for p in dir(self):
@@ -845,6 +850,15 @@ class Igm:
             self.PAD = [[0, 0], [0, 0]]
 
     def update_iceflow(self):
+        
+        if self.config.version=='v1':
+            self.update_iceflow_v1()
+        elif self.config.version=='v2':
+            self.update_iceflow_v2()
+        else:
+            print('wrong IGM version')
+
+    def update_iceflow_v1(self):
         """
         Ice flow dynamics are modeled using Artificial Neural Networks trained from physical models.
         
@@ -1412,8 +1426,17 @@ class Igm:
         self.nzpos  = self.usurf[I]
         self.nrhpos = tf.ones_like(self.X[I])
         self.nwpos  = tf.ones_like(self.X[I])
-
+        
     def update_particles(self):
+        
+        if self.config.version=='v1':
+            self.update_particles_v1()
+        elif self.config.version=='v2':
+            self.update_particles_v2()
+        else:
+            print('wrong IGM version')
+
+    def update_particles_v1(self):
         """
         IGM includes a particle tracking routine, which can compute a large number of trajectories (as it is implemented with TensorFlow to run in parallel) in live time during the forward model run. The routine produces some seeding of particles (by default in the accumulation area at regular intervals), and computes the time trajectory of the resulting particle in time advected by the velocity field in 3D. There are currently 2 implementations:
             
@@ -1993,7 +2016,7 @@ class Igm:
     ####################################################################################
     ####################################################################################
 
-    def read_config_param_optimize(self):
+    def read_config_param_optimize_v1(self):
 
         # OPTIMIZATION PARAMETERS
         self.parser.add_argument(
@@ -2272,8 +2295,17 @@ class Igm:
         # fig, axs = plt.subplots(1, 1, figsize=(8,16))
         # plt.quiver(self.flowdirx,self.flowdiry)
         # axs.axis("equal")
-
+        
     def optimize(self):
+        
+        if self.config.version=='v1':
+            self.optimize_v1()
+        elif self.config.version=='v2':
+            self.optimize_v2()
+        else:
+            print('wrong IGM version')
+
+    def optimize_v1(self):
         """
         This function does the data assimilation (inverse modelling) to optimize thk, strflowctrl ans usurf from data
         Check at this [page](https://github.com/jouvetg/igm/blob/main/doc/Inverse-modeling.md)
@@ -2819,8 +2851,8 @@ class Igm:
                 self.tcomp["Optimize"][-1] *= -1
 
                 if i % self.config.opti_output_freq == 0:
-                    self.update_plot_inversion(i, self.config.plot_live)
-                    self.update_ncdf_optimize(i)
+                    self.update_plot_inversion_v1(i, self.config.plot_live)
+                    self.update_ncdf_optimize_v1(i)
                 # self.update_plot_profiles(i,plot_live)
 
                 # stopping criterion: stop if the cost no longer decrease
@@ -2832,9 +2864,9 @@ class Igm:
         # now that the ice thickness is optimized, we can fix the bed once for all!
         self.topg.assign(self.usurf - self.thk)
 
-        self.output_ncdf_optimize_final()
+        self.output_ncdf_optimize_final_v1()
 
-        self.plot_cost_functions(self.costs, self.config.plot_live)
+        self.plot_cost_functions_v1(self.costs, self.config.plot_live)
 
         np.savetxt(
             os.path.join(self.config.working_dir, "costs.dat"),
@@ -2977,7 +3009,7 @@ class Igm:
             self.rmsusurf.append(0)
             self.stdusurf.append(0)
 
-    def update_ncdf_optimize(self, it):
+    def update_ncdf_optimize_v1(self, it):
         """
         Initialize and write the ncdf optimze file
         """
@@ -3065,7 +3097,7 @@ class Igm:
 
             nc.close()
 
-    def output_ncdf_optimize_final(self):
+    def output_ncdf_optimize_final_v1(self):
         """
         Write final geology after optimizing
         """
@@ -3142,7 +3174,7 @@ class Igm:
         
         os.system('echo rm '+ os.path.join(self.config.working_dir, self.config.geology_optimized_file) + ' >> clean.sh')
 
-    def plot_cost_functions(self, costs, plot_live):
+    def plot_cost_functions_v1(self, costs, plot_live):
 
         costs = np.stack(costs)
 
@@ -3170,7 +3202,7 @@ class Igm:
             
             os.system('echo rm '+ os.path.join(self.config.working_dir, "convergence.png") + ' >> clean.sh')
 
-    def update_plot_inversion(self, i, plot_live):
+    def update_plot_inversion_v1(self, i, plot_live):
         """
         Plot thickness, velocity, mand slidingco
         """
