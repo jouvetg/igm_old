@@ -410,7 +410,7 @@ class Igm:
         # load all variables
         for var in nc.variables:
             if not var in ["x", "y"]:
-                vars(self)[var].assign(
+                vars(self)[var] = (
                     np.squeeze(nc.variables[var][-1]).astype("float32")
                 )
 
@@ -710,7 +710,7 @@ class Igm:
                 self.saveresult = True
                 self.itsave += 1
             else:
-                self.t.assign(self.t.numpy() + self.dt)
+                self.t.assign(self.t + self.dt)
                 self.saveresult = False
 
             self.it += 1
@@ -904,7 +904,7 @@ class Igm:
         # Appplying scaling, and update variables
         Ny, Nx = self.thk.shape
         for kk, f in enumerate(self.iceflow_mapping["fieldout"]):
-            vars(self)[f].assign(
+            vars(self)[f] = (
                 tf.where(self.thk > 0, Y[0, :Ny, :Nx, kk], 0)
                 * self.iceflow_fieldbounds[f]
             )
@@ -914,14 +914,14 @@ class Igm:
 
             self.velbar_mag = self.getmag(self.ubar, self.vbar)
 
-            self.ubar.assign(
+            self.ubar = (
                 tf.where(
                     self.velbar_mag >= self.config.force_max_velbar,
                     self.config.force_max_velbar * (self.ubar / self.velbar_mag),
                     self.ubar,
                 )
             )
-            self.vbar.assign(
+            self.vbar = (
                 tf.where(
                     self.velbar_mag >= self.config.force_max_velbar,
                     self.config.force_max_velbar * (self.vbar / self.velbar_mag),
@@ -1078,7 +1078,7 @@ class Igm:
         smb = tf.clip_by_value(smb, -100, maxacc)
         smb = tf.where(self.icemask > 0.5, smb, -10)
 
-        self.smb.assign(smb)
+        self.smb = (smb)
 
     def init_smb_nn(self):
         """
@@ -1126,7 +1126,7 @@ class Igm:
 
         # this will return the smb, the only output of the smb nn emulator
         for kk, f in enumerate(self.smb_mapping["fieldout"]):
-            vars(self)[f].assign(Y[0, :, :, kk] * self.smb_fieldbounds[f])
+            vars(self)[f] = (Y[0, :, :, kk] * self.smb_fieldbounds[f])
 
     def update_smb(self):
         """
@@ -1157,10 +1157,10 @@ class Igm:
             if len(self.config.type_mass_balance) > 0:
                 getattr(self, "update_smb_" + self.config.type_mass_balance)()
             else:
-                self.smb.assign(tf.zeros_like(self.topg))
+                self.smb = (tf.zeros_like(self.topg))
 
             if not self.config.mb_scaling == 1:
-                self.smb.assign(self.smb * self.config.mb_scaling)
+                self.smb = (self.smb * self.config.mb_scaling)
 
             self.tlast_mb = self.t.numpy()
 
@@ -1251,18 +1251,18 @@ class Igm:
                 self.velbase_mag = self.getmag(self.uvelbase, self.vvelbase)
 
                 # apply erosion law, erosion rate is proportional to a power of basal sliding speed
-                self.dtopgdt.assign(
+                self.dtopgdt = (
                     self.config.erosion_cst
                     * (self.velbase_mag ** self.config.erosion_exp)
                 )
 
-                self.topg.assign(
+                self.topg = (
                     self.topg - (self.t.numpy() - self.tlast_erosion) * self.dtopgdt
                 )
 
                 print("max erosion is :", np.max(np.abs(self.dtopgdt)))
 
-                self.usurf.assign(self.topg + self.thk)
+                self.usurf = (self.topg + self.thk)
 
                 self.tlast_erosion = self.t.numpy()
 
@@ -1279,12 +1279,12 @@ class Igm:
                 self.tcomp["Uplift"].append(time.time())
 
                 # apply constant uplift rate
-                self.topg.assign(
+                self.topg = (
                     self.topg
                     + self.config.uplift_rate * (self.t.numpy() - self.tlast_uplift)
                 )
 
-                self.usurf.assign(self.topg + self.thk)
+                self.usurf = (self.topg + self.thk)
 
                 self.tlast_uplift = self.t.numpy()
 
@@ -1320,12 +1320,12 @@ class Igm:
             )
 
             # Forward Euler with projection to keep ice thickness non-negative
-            self.thk.assign(
+            self.thk = (
                 tf.maximum(self.thk + self.dt * (self.smb - self.divflux), 0)
             )
 
             # update ice surface accordingly
-            self.usurf.assign(self.topg + self.thk)
+            self.usurf = (self.topg + self.thk)
 
             # update gradients of the surface (slopes)
             self.slopsurfx, self.slopsurfy = self.compute_gradient_tf(
@@ -1564,7 +1564,7 @@ class Igm:
             nthk = othk + smb * self.dt  # new ice thicnkess after smb update
 
             # adjust the relative height within the ice column with smb
-            self.rhpos.assign(
+            self.rhpos = (
                 tf.where(
                     nthk > 0.1, tf.clip_by_value(self.rhpos * othk / nthk, 0, 1), 1
                 )
@@ -1577,10 +1577,10 @@ class Igm:
                 1 - (1 - self.rhpos) ** 4
             )  # SIA-like
 
-            self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
-            self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler 
+            self.xpos = (self.xpos + self.dt * uvel)  # forward euler
+            self.ypos = (self.ypos + self.dt * vvel)  # forward euler 
             
-            self.zpos.assign( topg + nthk * self.rhpos  )
+            self.zpos = ( topg + nthk * self.rhpos  )
             
         elif self.config.tracking_method=='3d':
             
@@ -1615,22 +1615,22 @@ class Igm:
 #           print('at the surface? : ',all(self.zpos == topg+othk))
 
             # make sure the particle remian withi the ice body
-            self.zpos.assign( tf.clip_by_value( self.zpos , topg, topg+othk) )
+            self.zpos = ( tf.clip_by_value( self.zpos , topg, topg+othk) )
             
             # get the relative height
-            self.rhpos.assign( tf.where( othk > 0.1, (self.zpos - topg)/othk , 1 ) )
+            self.rhpos = ( tf.where( othk > 0.1, (self.zpos - topg)/othk , 1 ) )
              
             uvel = uvelbase + (uvelsurf - uvelbase) * ( 1 - (1 - self.rhpos) ** 4)  # SIA-like
             vvel = vvelbase + (vvelsurf - vvelbase) * ( 1 - (1 - self.rhpos) ** 4)  # SIA-like
             wvel = wvelbase + (wvelsurf - wvelbase) * ( 1 - (1 - self.rhpos) ** 4)  # SIA-like
                
-            self.xpos.assign(self.xpos + self.dt * uvel)  # forward euler
-            self.ypos.assign(self.ypos + self.dt * vvel)  # forward euler 
-            self.zpos.assign(self.zpos + self.dt * wvel)  # forward euler 
+            self.xpos = (self.xpos + self.dt * uvel)  # forward euler
+            self.ypos = (self.ypos + self.dt * vvel)  # forward euler 
+            self.zpos = (self.zpos + self.dt * wvel)  # forward euler 
             
             # make sur the particle remains in the horiz. comp. domain
-            self.xpos.assign(tf.clip_by_value(self.xpos,self.x[0],self.x[-1]))
-            self.ypos.assign(tf.clip_by_value(self.ypos,self.y[0],self.y[-1]))
+            self.xpos = (tf.clip_by_value(self.xpos,self.x[0],self.x[-1]))
+            self.ypos = (tf.clip_by_value(self.ypos,self.y[0],self.y[-1]))
 
         indices = tf.concat(
             [
@@ -1738,7 +1738,7 @@ class Igm:
          
                 import tensorflow_addons as tfa
                  
-                self.thk.assign( tfa.image.gaussian_filter2d(self.thk, 
+                self.thk = ( tfa.image.gaussian_filter2d(self.thk, 
                                                        sigma=self.config.smoothing_thk_sigma, 
                                                        filter_shape=self.config.smoothing_thk_filter_shape,
                                                        padding="CONSTANT") )
@@ -1802,7 +1802,7 @@ class Igm:
         nz = tf.ones(self.thk.shape, "int32") * (self.height.shape[0] - 1)
         for k in range(self.height.shape[0] - 1, -1, -1):
             nz = tf.where(self.height[k] > self.thk, k, nz)
-        self.nz.assign(tf.where(self.thk >= self.ddz[0], nz, 1))
+        self.nz = (tf.where(self.thk >= self.ddz[0], nz, 1))
 
         # depth is the depth of ice at any grid point, otherwise it is zero
         depth = []
@@ -1814,13 +1814,13 @@ class Igm:
                     0.0,
                 )
             )
-        self.depth.assign(tf.stack(depth, axis=0))
+        self.depth = (tf.stack(depth, axis=0))
 
         # dz is the  vertical spacing,
         dz = []
         for k in range(0, self.height.shape[0] - 1):
             dz.append(tf.ones_like(self.thk) * self.ddz[k])
-        self.dz.assign(tf.stack(dz, axis=0))
+        self.dz = (tf.stack(dz, axis=0))
 
     @tf.function()
     def update_reconstruct_3dvel_tf(self):
@@ -1849,9 +1849,9 @@ class Igm:
             V.append(self.vvelbase + fshear[k] * (self.vvelsurf - self.vvelbase))
             W.append(self.vvelbase + fshear[k] * (self.wvelsurf - self.wvelbase))
 
-        self.U.assign(tf.stack(U, axis=0))
-        self.V.assign(tf.stack(V, axis=0))
-        self.W.assign(tf.stack(W, axis=0))
+        self.U = (tf.stack(U, axis=0))
+        self.V = (tf.stack(V, axis=0))
+        self.W = (tf.stack(W, axis=0))
 
         # Ui = tf.pad(self.U, [[0, 0], [0, 0], [1, 1]], "SYMMETRIC")
         # Vj = tf.pad(self.V, [[0, 0], [1, 1], [0, 0]], "SYMMETRIC")
@@ -1870,7 +1870,7 @@ class Igm:
         # for k in range(0, self.height.shape[0]):
         #     W.append(self.wvelbase + fshear[k] * (self.wvelsurf - self.wvelbase))
 
-        # self.W.assign(tf.stack(W, axis=0))
+        # self.W = (tf.stack(W, axis=0))
 
         ### This methods integrates the imcompressiblity conditoons
 
@@ -1883,7 +1883,7 @@ class Igm:
         #                                 0.0 )
         #             )
 
-        # self.W.assign( tf.stack(W,axis=0) )
+        # self.W = ( tf.stack(W,axis=0) )
 
     def update_3dvel(self):
 
@@ -2283,7 +2283,7 @@ class Igm:
 
         # Same as gaussian filter above but for tensorflow is (NOT TESTED)
         # import tensorflow_addons as tfa
-        # self.flowdirx.assign( tfa.image.gaussian_filter2d( self.flowdirx , sigma=3, filter_shape=100, padding="CONSTANT") )
+        # self.flowdirx = ( tfa.image.gaussian_filter2d( self.flowdirx , sigma=3, filter_shape=100, padding="CONSTANT") )
 
         self.flowdirx /= self.getmag(self.flowdirx, self.flowdiry)
         self.flowdiry /= self.getmag(self.flowdirx, self.flowdiry)
@@ -2361,12 +2361,12 @@ class Igm:
             self.make_data_holes()
 
         if hasattr(self, "thkinit"):
-            self.thk.assign(self.thkinit)
+            self.thk = (self.thkinit)
         else:
-            self.thk.assign(tf.zeros_like(self.thk))
+            self.thk = (tf.zeros_like(self.thk))
 
         if self.config.opti_init_zero_thk:
-            self.thk.assign(tf.zeros_like(self.thk))
+            self.thk = (tf.zeros_like(self.thk))
 
         ###### PREPARE OPIMIZER
         
@@ -2536,7 +2536,7 @@ class Igm:
 
                 # save output variables into self.variables for outputs
                 for kk, f in enumerate(self.iceflow_mapping["fieldout"]):
-                    vars(self)[f].assign(
+                    vars(self)[f] = (
                         Y[0, :Ny, :Nx, kk] * self.iceflow_fieldbounds[f]
                     )
 
@@ -2832,14 +2832,14 @@ class Igm:
 
                 # get back optimized variables in the pool of self.variables
                 if "thk" in self.config.opti_control:
-                    self.thk.assign(thk * self.iceflow_fieldbounds["thk"])
-                    self.thk.assign(tf.where(self.thk < 0.01, 0, self.thk))
+                    self.thk = (thk * self.iceflow_fieldbounds["thk"])
+                    self.thk = (tf.where(self.thk < 0.01, 0, self.thk))
                 if "strflowctrl" in self.config.opti_control:
-                    self.strflowctrl.assign(
+                    self.strflowctrl = (
                         strflowctrl * self.iceflow_fieldbounds["strflowctrl"]
                     )
                 if "usurf" in self.config.opti_control:
-                    self.usurf.assign(usurf * self.iceflow_fieldbounds["usurf"])
+                    self.usurf = (usurf * self.iceflow_fieldbounds["usurf"])
 
                 self.divflux = self.compute_divflux(
                     self.ubar, self.vbar, self.thk, self.dx, self.dx
@@ -2862,7 +2862,7 @@ class Igm:
                 #         break;
 
         # now that the ice thickness is optimized, we can fix the bed once for all!
-        self.topg.assign(self.usurf - self.thk)
+        self.topg = (self.usurf - self.thk)
 
         self.output_ncdf_optimize_final_v1()
 
@@ -3032,7 +3032,7 @@ class Igm:
             )
 
         if "topg" in self.config.opti_vars_to_save:
-            self.topg.assign(self.usurf - self.thk)
+            self.topg = (self.usurf - self.thk)
 
         if "velsurf_mag" in self.config.opti_vars_to_save:
             self.velsurf_mag = self.getmag(self.uvelsurf, self.vvelsurf)
