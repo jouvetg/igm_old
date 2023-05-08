@@ -11,7 +11,8 @@ Published under the GNU GPL (Version 3), check at the LICENSE file
 #      INITIALIZATION : contains all to initialize variables
 #      I/O NCDF : Files for data Input/Output using NetCDF file format
 #      COMPUTE T AND DT : Function to compute adaptive time-step and time
-#      ICEFLOW : Containt the function that serve compute the emulated iceflow
+#      ICEFLOW V1 : Containt the function that serve compute the emulated iceflow
+#      ICEFLOW V2 : Containt the function that serve compute the emulated iceflow
 #      CLIMATE : Templates for function updating climate
 #      MASS BALANCE : Simple mass balance
 #      EROSION : Erosion law
@@ -759,7 +760,7 @@ class Igm:
     ####################################################################################
     ####################################################################################
     ####################################################################################
-    #                               ICEFLOW
+    #                               ICEFLOW (V1)
     ####################################################################################
     ####################################################################################
     ####################################################################################
@@ -931,6 +932,865 @@ class Igm:
 
         self.tcomp["Ice flow"][-1] -= time.time()
         self.tcomp["Ice flow"][-1] *= -1
+        
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+    #                               ICEFLOW (V2)
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+    
+    def read_config_param_update_iceflow_Glen(self):
+        
+        self.parser.add_argument(
+            "--iceflow_physics",
+            type=int,
+            default=2,
+            help="2 for blatter, 4 for stokes"
+        ) 
+
+        self.parser.add_argument(
+            "--solve_iceflow_step_size", 
+            type=float, default=1, 
+            help="solver_step_size",
+        )
+
+        self.parser.add_argument(
+            "--solve_iceflow_nbitmax", 
+            type=int, default=1, 
+            help="solver_nbitmax",
+        )        
+        self.parser.add_argument(
+            "--Nz",
+            type=int,
+            default=10,
+            help="Nz for the vertical discretization",
+        )
+        self.parser.add_argument(
+            "--vert_spacing",
+            type=float,
+            default=4.0,
+            help="1.0 for equal vertical spacing, 4.0 otherwise (4.0)",
+        )
+        self.parser.add_argument(
+            "--regu_glen",
+            type=float,
+            default=10**(-5),
+            help="Regularization parameter for Glen's flow law",
+        )
+        self.parser.add_argument(
+            "--regu_weertman",
+            type=float,
+            default=10**(-10),
+            help="Regularization parameter for Weertman's sliding law",
+        )
+        self.parser.add_argument(
+            "--exp_glen",
+            type=float,
+            default=3,
+            help="Glen's flow law exponent",
+        )
+        self.parser.add_argument(
+            "--exp_weertman",
+            type=float,
+            default=3,
+            help="Weertman's law exponent"
+        )   
+        self.parser.add_argument(
+            "--thr_ice_thk",
+            type=float,
+            default=0.1,
+            help="Threshold Ice thickness for computing strain rate"
+        )   
+        
+        self.parser.add_argument(
+            "--network", 
+            type=str, 
+            default="cnn", 
+            help="This is the type of network, it can be cnn or unet"
+        )
+        self.parser.add_argument(
+            "--activation", 
+            type=str, 
+            default='lrelu', 
+            help="lrelu",
+        )
+        self.parser.add_argument(
+            "--nb_layers", 
+            type=int, 
+            default=16, 
+            help="nb_layers",
+        )
+        self.parser.add_argument(
+            "--nb_blocks", 
+            type=int, 
+            default=4,  
+            help="Number of block layer in the U-net",
+        )
+        self.parser.add_argument(
+            "--nb_out_filter", 
+            type=int, 
+            default=32, 
+            help="nb_out_filter",
+        )
+        self.parser.add_argument(
+            "--conv_ker_size", 
+            type=int, 
+            default=3, 
+            help="conv_ker_size",
+        )
+        self.parser.add_argument(
+            "--dropout_rate", 
+            type=float, 
+            default=0, 
+            help="dropout_rate",
+        )
+        self.parser.add_argument(
+            "--epochs", 
+            type=int, 
+            default=2000, 
+            help="epochs",
+        )        
+        self.parser.add_argument(
+            "--freq_test", 
+            type=int, 
+            default=10, 
+            help="freq_test",
+        ) 
+        self.parser.add_argument(
+            "--pathofresults", 
+            type=str, 
+            default='pathofresults', 
+            help="pathofresults",
+        )  
+        self.parser.add_argument(
+            "--train_iceflow_emulator_lr", 
+            type=float, 
+            default=0.0001, 
+            help="train_iceflow_emulator_lr",
+        )
+        self.parser.add_argument(
+            "--train_iceflow_emulator_restart_lr", 
+            type=int, 
+            default=0, 
+            help="train_iceflow_emulator_restart_lr",
+        )  
+        self.parser.add_argument(
+            "--retrain_iceflow_emulator_freq", 
+            type=int, 
+            default=1, 
+            help="retrain_iceflow_emulator_freq",
+        )   
+        self.parser.add_argument(
+            "--retrain_iceflow_emulator_lr", 
+            type=float, 
+            default=0.00002, 
+            help="retrain_iceflow_emulator_lr",
+        )  
+        self.parser.add_argument(
+            "--retrain_iceflow_emulator_nbit", 
+            type=float, 
+            default=1, 
+            help="retrain_iceflow_emulator_nbit",
+        )  
+        self.parser.add_argument(
+            "--retrain_iceflow_emulator_framesizemax", 
+            type=float, 
+            default=700, 
+            help="retrain_iceflow_emulator_framesizemax",
+        )        
+        self.parser.add_argument(
+            "--forceit", 
+            type=int, 
+            default=-1, 
+            help="forceit",
+        )  
+        self.parser.add_argument(
+            "--fieldin", 
+            type=list, 
+            default=["thk", "usurf", "arrhenius","slidingco", "dX"], 
+            help="Input parameter of the iceflow emulator",
+        )  
+        
+    @tf.function(experimental_relax_shapes=True)
+    def compute_gradient(self, s, dX, dY):
+        """
+        compute spatial 2D gradient of a given field
+        """
+ 
+        E     = 2.0 * (s[:,:, 1:] - s[:,:, :-1]) / (dX[:,:, 1:] + dX[:,:, :-1])
+        diffx = 0.5*(E[:,1:,:] + E[:,:-1,:])
+
+        EE    = 2.0 * (s[:,1:, :] - s[:,:-1, :]) / (dY[:,1:, :] + dY[:,:-1, :])
+        diffy = 0.5*(EE[:,:, 1:] + EE[:,:, :-1])
+        
+        return diffx, diffy
+    
+    @tf.function(experimental_relax_shapes=True)
+    def compute_strainrate_Glen_tf(self, U, thk, dX, ddz, sloptopgx, sloptopgy, thr):
+ 
+        # Compute horinzontal derivatives
+        dUdx = (U[:,0,:, :, 1:] - U[:,0,:, :, :-1]) / dX[0,0,0]
+        dVdx = (U[:,1,:, :, 1:] - U[:,1,:, :, :-1]) / dX[0,0,0]
+        dUdy = (U[:,0,:, 1:, :] - U[:,0,:, :-1, :]) / dX[0,0,0]
+        dVdy = (U[:,1,:, 1:, :] - U[:,1,:, :-1, :]) / dX[0,0,0]
+ 
+        # Homgenize sizes in the horizontal plan on the stagerred grid
+        dUdx = (dUdx[:,:,:-1,:] + dUdx[:,:,1:,:])/2
+        dVdx = (dVdx[:,:,:-1,:] + dVdx[:,:,1:,:])/2
+        dUdy = (dUdy[:,:,:,:-1] + dUdy[:,:,:,1:])/2
+        dVdy = (dVdy[:,:,:,:-1] + dVdy[:,:,:,1:])/2
+ 
+        # homgenize sizes in the vertical plan on the stagerred grid
+        if U.shape[2]>1:
+            dUdx = (dUdx[:,:-1,:,:] + dUdx[:,1:,:,:])/2
+            dVdx = (dVdx[:,:-1,:,:] + dVdx[:,1:,:,:])/2
+            dUdy = (dUdy[:,:-1,:,:] + dUdy[:,1:,:,:])/2
+            dVdy = (dVdy[:,:-1,:,:] + dVdy[:,1:,:,:])/2        
+
+        # compute the horizontal average, these quantitites will be used for vertical derivatives
+        Um = (U[:,0,:,1:,1:] + U[:,0,:,1:,:-1] + U[:,0,:,:-1,1:] + U[:,0,:,:-1,:-1] )/4
+        Vm = (U[:,1,:,1:,1:] + U[:,1,:,1:,:-1] + U[:,1,:,:-1,1:] + U[:,1,:,:-1,:-1] )/4
+          
+        if U.shape[2]>1:
+            # vertical derivative if there is at least two layears
+            dUdz = (Um[:,1:, :, :] - Um[:,:-1, :, :]) / tf.maximum(ddz,thr) 
+            dVdz = (Vm[:,1:, :, :] - Vm[:,:-1, :, :]) / tf.maximum(ddz,thr)
+        else:
+            # zero otherwise
+            dUdz = 0.0
+            dVdz = 0.0
+            
+        # If Stokes (and not Blatter), one has to do the same with the 3rd component 
+        if U.shape[1]>2:
+            dWdx = (U[:,2,:, :, 1:] - U[:,2,:, :, :-1]) / dX[0,0,0]
+            dWdy = (U[:,2,:, 1:, :] - U[:,2,:, :-1, :]) / dX[0,0,0]
+            
+            dWdx = (dWdx[:,:,:-1,:] + dWdx[:,:,1:,:])/2
+            dWdy = (dWdy[:,:,:,:-1] + dWdy[:,:,:,1:])/2
+            
+            if U.shape[2]>1: 
+                dWdx = (dWdx[:,:-1,:,:] + dWdx[:,1:,:,:])/2
+                dWdy = (dWdy[:,:-1,:,:] + dWdy[:,1:,:,:])/2
+            
+            Wm   = (U[:,2,:,1:,1:] + U[:,2,:,1:,:-1] + U[:,2,:,:-1,1:] + U[:,2,:,:-1,:-1] )/4
+            
+            if U.shape[2]>1:
+                dWdz = (Wm[:,1:, :, :] - Wm[:,:-1, :, :]) / tf.maximum(ddz,thr)
+            else: 
+                dWdz = 0.0 
+            
+        # This correct for the change of coordinate z -> z - b
+        dUdx = dUdx - dUdz*sloptopgx
+        dUdy = dUdy - dUdz*sloptopgy
+        dVdx = dVdx - dVdz*sloptopgx
+        dVdy = dVdy - dVdz*sloptopgy
+        
+        if U.shape[1]>2:
+              dWdx = dWdx - dWdz*sloptopgx
+              dWdy = dWdy - dWdz*sloptopgy
+            
+        # Get element of the matrix for Stokes
+        if U.shape[1]>2:
+            Exx = dUdx 
+            Eyy = dVdy 
+            Ezz = dWdz
+            Exy = 0.5 * dVdx + 0.5 * dUdy
+            Exz = 0.5 * dUdz + 0.5 * dWdx
+            Eyz = 0.5 * dVdz + 0.5 * dWdy
+            DIV = Exx + Eyy + Ezz
+            
+        # Get element of the matrix for Blatter
+        else:
+            Exx = dUdx 
+            Eyy = dVdy 
+            Ezz = - dUdx - dVdy
+            Exy = 0.5 * dVdx + 0.5 * dUdy
+            Exz = 0.5 * dUdz
+            Eyz = 0.5 * dVdz
+            DIV = 0.0
+
+        return  0.5*( Exx ** 2 + Exy ** 2 + Exz ** 2 \
+                    + Exy ** 2 + Eyy ** 2 + Eyz ** 2 \
+                    + Exz ** 2 + Eyz ** 2 + Ezz ** 2 ), DIV
+
+    def stag2(self,B):
+        return (B[:,1:] + B[:,:1])/2
+
+    def stag4(self,B):
+        return (B[:,1:,1:] + B[:,1:,:-1] + B[:,:-1,1:] + B[:,:-1,:-1])/4
+ 
+    def stag8(self,B):
+        return (B[:,1:,1:,1:]  + B[:,1:,1:,:-1]  + B[:,1:,:-1,1:]  + B[:,1:,:-1,:-1] +
+                B[:,:-1,1:,1:] + B[:,:-1,1:,:-1] + B[:,:-1,:-1,1:] + B[:,:-1,:-1,:-1] ) / 8
+
+    @tf.function(experimental_relax_shapes=True)
+    def iceflow_energy(self, U, thk, usurf, arrhenius, slidingco, dX):
+        
+        # warning, the energy is here normalized dividing by int_Omega
+        
+        COND = (thk[:,1:, 1:]>0) & (thk[:,1:,:-1]>0) & (thk[:,:-1,1:]>0) & (thk[:,:-1,:-1]>0)
+        COND = tf.expand_dims(COND,axis=1)
+
+        # Vertical discretization    
+        if self.config.Nz>1:
+            zeta    = np.arange(self.config.Nz) / (self.config.Nz-1)
+            temp    = ((zeta / self.config.vert_spacing) * (1.0 + (self.config.vert_spacing - 1.0) * zeta))
+            temd    = temp[1:] - temp[:-1]
+            dz      = tf.stack([self.stag4(thk)*z for z in temd],axis=1)  
+        else:
+            dz      = tf.expand_dims(self.stag4(thk),axis=0)
+
+        # B has Unit Mpa y^(1/n) 
+        B = 2.0*arrhenius**(-1.0/self.config.exp_glen) 
+         
+        if self.config.exp_weertman==1:
+            # C has unit Mpa y^m m^(-m)
+            C = slidingco
+        else:
+            C = (slidingco+10**(-12))**-(1.0/self.config.exp_weertman)
+        
+        p = 1.0 + 1.0 / self.config.exp_glen
+        s = 1.0 + 1.0 / self.config.exp_weertman
+        
+        sloptopgx, sloptopgy = self.compute_gradient(usurf-thk, dX, dX)
+        sloptopgx = tf.expand_dims(sloptopgx,axis=1)
+        sloptopgy = tf.expand_dims(sloptopgy,axis=1)
+        
+        # TODO : sloptopgx, sloptopgy must be the elevaion of layers! not the bedrock, this probably has very little effects.
+                
+        # sr has unit y^(-1)
+        sr,div = self.compute_strainrate_Glen_tf(U, thk, dX, dz, sloptopgx, sloptopgy, thr=self.config.thr_ice_thk)
+         
+        sr = tf.where( COND, sr, 0.0) 
+        
+        # C_shear is unit  Mpa y^(1/n) y^(-1-1/n) * m^3 = Mpa y^(-1) m^3
+        C_shear = tf.reduce_mean( self.stag4(B) * tf.reduce_sum( dz*( \
+                                 (sr + self.config.regu_glen**2)**(p/2)), axis=1 ), \
+                                 axis=(-1,-2) ) / p
+
+        # C_slid is unit Mpa y^m m^(-m) * m^(1+m) * y^(-1-m) * m*2 = Mpa y^(-1) m^3          
+        N = self.stag4(U[:, 0, 0, :, :]**2 + U[:, 1, 0, :, :]**2) + self.config.regu_weertman**2 \
+          + (self.stag4(U[:, 0, 0, :, :])*sloptopgx + self.stag4(U[:, 1, 0, :, :])*sloptopgy)**2
+        C_slid = tf.reduce_mean( self.stag4(C) * N**(s/2), axis=(-1,-2) ) / s
+
+        if self.config.iceflow_physics==2:
+            
+            slopsurfx, slopsurfy = self.compute_gradient(usurf, dX, dX)
+            slopsurfx = tf.expand_dims(slopsurfx,axis=1)
+            slopsurfy = tf.expand_dims(slopsurfy,axis=1) 
+            
+            uds = self.stag8(U[:,0])*slopsurfx + self.stag8(U[:,1])*slopsurfy
+            uds = tf.where( COND, uds, 0.0)
+            C_grav = 910 * 9.81 * 10**(-6) * tf.reduce_mean( tf.reduce_sum(dz * uds, axis=1) , axis=(-1,-2) )
+            
+        elif self.config.iceflow_physics==4:
+            # w = self.stag8(U[:, 2])
+            # w = tf.where( COND, w, 0.0)
+            slopsurfx, slopsurfy = self.compute_gradient(usurf, dX, dX)
+            slopsurfx = tf.expand_dims(slopsurfx,axis=1)
+            slopsurfy = tf.expand_dims(slopsurfy,axis=1)
+            w   = self.stag8(U[:,0])*slopsurfx + self.stag8(U[:,1])*slopsurfy
+            p   = self.stag8(U[:,3])
+            p   = tf.where( COND, p, 0.0)
+            C_grav = 910 * 9.81 * 10**(-6) * tf.reduce_mean( tf.reduce_sum(dz * w,     axis=1) , axis=(-1,-2) ) \
+                                - 10**(-6) * tf.reduce_mean( tf.reduce_sum(dz * p*div, axis=1) , axis=(-1,-2) )
+            
+        else:
+            print('wrong iceflow_physics (must be 2 or 4)')
+            
+#        print(C_shear[0].numpy(),C_slid[0].numpy(),C_grav[0].numpy(),C_front[0].numpy())
+
+        return tf.reduce_mean( C_shear + C_slid + C_grav ) # * dX[:,0,0]**2 
+    
+    @tf.function(experimental_relax_shapes=True)
+    def iceflow_energy_XY(self, X, Y):
+   
+        N = self.config.Nz  
+        
+        if self.config.iceflow_physics==2:
+            U = tf.stack([tf.experimental.numpy.moveaxis(Y[:,:,:,:N],[-1],[1]),
+                          tf.experimental.numpy.moveaxis(Y[:,:,:,N:],[-1],[1])], axis=1)
+        elif self.config.iceflow_physics==4:
+            U = tf.stack([tf.experimental.numpy.moveaxis(Y[:,:,:,:N],[-1],[1]),
+                          tf.experimental.numpy.moveaxis(Y[:,:,:,N:2*N],[-1],[1]),
+                          tf.experimental.numpy.moveaxis(Y[:,:,:,2*N:3*N],[-1],[1]),
+                          tf.experimental.numpy.moveaxis(Y[:,:,:,3*N:],[-1],[1])], axis=1)
+        else:
+            print('wrong iceflow_physics (must be 2 or 4)')
+
+        return self.iceflow_energy(U, X[:,:,:,0], X[:,:,:,1], X[:,:,:,2], X[:,:,:,3], X[:,:,:,4])
+
+    def Y_to_U(self, Y):
+        
+        N = self.config.Nz  
+         
+        if self.config.iceflow_physics==2:
+            U = tf.stack([tf.experimental.numpy.moveaxis(Y[0,:,:,:N],[-1],[0]),
+                          tf.experimental.numpy.moveaxis(Y[0,:,:,N:],[-1],[0])], axis=0)
+        elif self.config.iceflow_physics==4:
+            U = tf.stack([tf.experimental.numpy.moveaxis(Y[0,:,:,:N],[-1],[0]),
+                          tf.experimental.numpy.moveaxis(Y[0,:,:,N:2*N],[-1],[0]),
+                          tf.experimental.numpy.moveaxis(Y[0,:,:,2*N:3*N],[-1],[0]),
+                          tf.experimental.numpy.moveaxis(Y[0,:,:,3*N:],[-1],[0])], axis=0)
+        else:
+            print('wrong iceflow_physics (must be 2 or 4)')
+
+        return U
+
+    def U_to_Y(self, U):
+        
+        if self.config.iceflow_physics==2:
+            UU = tf.experimental.numpy.moveaxis(U[0],[0],[-1])
+            VV = tf.experimental.numpy.moveaxis(U[1],[0],[-1])
+            RR = tf.expand_dims( tf.concat( [UU,VV], axis=-1, ), axis=0, )
+        elif self.config.iceflow_physics==4:
+            UU =  tf.experimental.numpy.moveaxis(U[0],[0],[-1])
+            VV =  tf.experimental.numpy.moveaxis(U[1],[0],[-1])
+            WW =  tf.experimental.numpy.moveaxis(U[2],[0],[-1])
+            PP =  tf.experimental.numpy.moveaxis(U[3],[0],[-1])
+            RR = tf.expand_dims( tf.concat( [UU,VV,WW,PP], axis=-1, ), axis=0, )
+        else:
+            print('wrong iceflow_physics (must be 2 or 4)')
+ 
+        return RR
+    
+
+    def solve_iceflow(self,U,stop_if_no_decrease=False):
+        """
+             solve_iceflow
+        """
+        
+        from IPython.display import display, clear_output
+        
+        if not hasattr(self, "already_called_solve_iceflow"):
+            self.already_called_solve_iceflow = True 
+            
+            self.define_vertical_weight()
+
+            if int(tf.__version__.split('.')[1])<=10:
+                self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.config.solve_iceflow_step_size) 
+            else:
+                self.optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=self.config.solve_iceflow_step_size)
+                
+        MISFIT = []
+          
+        if self.config.plot_live:
+            self.fig = plt.figure(dpi=200)
+            self.ax = self.fig.add_subplot(1, 1, 1)
+            
+            # self.ax.axis("off")
+            # velmag = tf.norm( U[:,-1,:,:], axis=0 )
+            # im = self.ax.imshow(velmag, origin="lower", cmap="viridis",  vmin=0,vmax=500) # [200:250,350:400]
+            # self.cbar = plt.colorbar(im)
+            
+            self.ax.plot(self.X[2,:],U[1,-1,2,:]  )
+ 
+        for i in range(self.config.solve_iceflow_nbitmax):
+
+            with tf.GradientTape() as t:
+
+                t.watch(U) 
+
+                COST = self.iceflow_energy(tf.expand_dims(U, axis=0), \
+                                tf.expand_dims(self.thk, axis=0), \
+                                tf.expand_dims(self.usurf, axis=0), \
+                                tf.expand_dims(self.arrhenius, axis=0), \
+                                tf.expand_dims(self.slidingco, axis=0), \
+                                tf.expand_dims(self.dX, axis=0)) \
+  
+                MISFIT.append(COST)
+                 
+                # Stop if the cost no longer decreases
+                if stop_if_no_decrease:
+                    if i>1:
+                        if MISFIT[-1]>=MISFIT[-2]:
+                            break
+  
+                grads = tf.Variable(t.gradient(COST, [U]))
+ 
+                self.optimizer.apply_gradients(zip([grads[i] for i in range(grads.shape[0])], [U]))
+                
+                if (i+1)%100==0:
+                    
+                    DDD = tf.norm( tf.where(self.thk>0, grads, 0) )
+                    velsurf_mag = tf.sqrt(U[0,-1]**2+U[1,-1]**2)
+                    T=velsurf_mag.shape[0]; i0=int(T/3) ; i1=int(2*T/3)
+#                    print('solve :',i,COST.numpy(),DDD.numpy(),np.max(velsurf_mag),np.max(velsurf_mag[i0:i1,i0:i1]))
+                    print('solve :',i,COST.numpy(),DDD.numpy(),np.max(velsurf_mag))
+
+                    if self.config.plot_live:
+                        # velmag = tf.norm( U[:,-1,:,:], axis=0 ) 
+                        # im = self.ax.imshow(velmag, origin="lower", cmap="viridis",  vmin=0,vmax=500 )
+                        # clear_output(wait=True)
+                        # display(self.fig)
+                        
+                        self.ax.plot(self.X[2,:],U[1,-1,2,:] )
+                        clear_output(wait=True)
+                        display(self.fig)
+                
+#        print('nb of it : ',len(MISFIT))
+          
+        U=tf.where(self.thk>0,U,0)
+        
+        return U,MISFIT
+
+    def update_iceflow_solved(self,stop_if_no_decrease=False):
+        """
+              update_iceflow_solved
+        """
+         
+        if not hasattr(self, "already_called_update_iceflow_solved"):
+            self.already_called_update_iceflow_solved = True 
+            self.tcomp["Ice flow Solv"] = []
+
+            if not hasattr(self, "U"):
+                self.U = tf.Variable(tf.zeros((self.config.iceflow_physics,self.config.Nz, \
+                                               self.thk.shape[0], self.thk.shape[1])))
+            
+        self.tcomp["Ice flow Solv"].append(time.time())
+
+        U, MISFIT = self.solve_iceflow(self.U,stop_if_no_decrease)
+        
+        self.U.assign(U) 
+        
+        self.COST_Glen = MISFIT[-1].numpy()
+        
+        self.update_2d_iceflow_variables()
+        
+        self.tcomp["Ice flow Solv"][-1] -= time.time()
+        self.tcomp["Ice flow Solv"][-1] *= -1
+           
+    def define_vertical_weight(self):
+        """
+              define_vertical_weight
+        """
+
+        zeta    = np.arange(self.config.Nz+1) / self.config.Nz
+        weight  = ((zeta / self.config.vert_spacing) * (1.0 + (self.config.vert_spacing - 1.0) * zeta))
+        weight       = tf.Variable(weight[1:] - weight[:-1],dtype=tf.float32)
+        self.vert_weight  = tf.expand_dims( tf.expand_dims( weight , axis=-1) , axis=-1)
+    
+    def update_2d_iceflow_variables(self):
+        """
+              update_2d_iceflow_variables
+        """
+        
+        self.uvelbase = self.U[0,0, :, :] 
+        self.vvelbase = self.U[1,0, :, :] 
+        self.ubar     = tf.reduce_sum(self.U[0]*self.vert_weight, axis=0) 
+        self.vbar     = tf.reduce_sum(self.U[1]*self.vert_weight, axis=0) 
+        self.uvelsurf = self.U[0,-1, :, :] 
+        self.vvelsurf = self.U[1,-1, :, :] 
+
+    def initialize_iceflow_emulated(self):
+        """
+        set-up the iceflow emulator
+        """
+
+        if self.config.iceflow_model_lib_path=='':
+             
+            self.fieldin  = self.config.fieldin
+            
+            nb_inputs  = len(self.fieldin)
+            nb_outputs = self.config.iceflow_physics*self.config.Nz     
+
+            # if self.config.normalize:
+            #     self.norm_in  = np.square([1000,5000,100,10000,100])
+            #     self.norm_out = np.square([1.0/1000.0 for ik in range(nb_outputs)])
+            
+            self.iceflow_model = getattr(self, self.config.network)(nb_inputs, nb_outputs)
+            
+        else:
+ 
+            dirpath = self.config.iceflow_model_lib_path  
+
+            self.fieldin = [] 
+            fid = open(os.path.join(dirpath, "fieldin.dat"), "r")
+            for fileline in fid:
+                part = fileline.split()
+                self.fieldin.append(part[0]) 
+            fid.close()
+             
+            fid = open(os.path.join(dirpath, "vert_grid.dat"), "r")
+            for i,fileline in enumerate(fid):
+                part = fileline.split()
+                if i==0:
+                    if not int(part[0])==self.config.Nz:
+                        self.config.Nz = int(part[0])
+                        print('Warning : change config.Nz to ',self.config.Nz)
+                if i==1:
+                    if not float(part[0])==self.config.vert_spacing:
+                        self.config.vert_spacing = int(part[0])
+                        print('Warning : change config.vert_spacing to ',self.config.vert_spacing)
+            fid.close()
+     
+            self.iceflow_model = tf.keras.models.load_model( os.path.join(dirpath, "model.h5") )
+            
+            self.iceflow_model.compile()
+         
+        self.define_vertical_weight()
+
+        Ny = self.thk.shape[0]
+        Nx = self.thk.shape[1]
+        
+        # In case of a U-net, must make sure the I/O size is multiple of 2**N
+        if self.config.multiple_window_size > 0:
+            NNy = self.config.multiple_window_size * math.ceil(
+                Ny / self.config.multiple_window_size
+            )
+            NNx = self.config.multiple_window_size * math.ceil(
+                Nx / self.config.multiple_window_size
+            )
+            self.PAD = [[0, NNy - Ny], [0, NNx - Nx]]
+        else:
+            self.PAD = [[0, 0], [0, 0]]
+
+        self.COST_emulator = 0
+ 
+    def update_iceflow_emulated(self):
+        """
+              update_iceflow_emulated
+        """
+         
+        if not hasattr(self, "already_called_update_iceflow_emulated"):
+            self.already_called_update_iceflow_emulated = True 
+            self.tcomp["Iceflow Emul"] = []
+
+            self.initialize_iceflow_emulated()   
+                
+            if not hasattr(self, "U"):
+                self.U = tf.Variable(tf.zeros((self.config.iceflow_physics,self.config.Nz, \
+                                               self.thk.shape[0], self.thk.shape[1]))) 
+ 
+        ##################################################
+            
+        self.tcomp["Iceflow Emul"].append(time.time())
+ 
+        if self.config.verbosity == 1:
+            print("Update ICEFLOW at time : ", self.t)
+ 
+        # Define the input of the NN, include scaling
+        X = tf.expand_dims( tf.stack(
+                [ tf.pad(vars(self)[f], self.PAD, "CONSTANT") for f in self.fieldin ],
+                                     axis=-1, ), axis=0, )
+ 
+        Y = self.iceflow_model(X)
+        
+#        COST = self.iceflow_energy_XY(X,Y)     # TO BE COMMENTED ON THE LONG TERM
+#        self.COST_emulator = COST.numpy()   # TO BE COMMENTED ON THE LONG TERM
+
+        Ny, Nx = self.thk.shape
+        N      = self.config.Nz  
+        
+        U = self.Y_to_U(Y[:,:Ny,:Nx,:])
+        
+        U = tf.where(self.thk>0,U,0)
+        
+        self.U.assign(U)
+        
+        self.update_2d_iceflow_variables()
+        
+        self.tcomp["Iceflow Emul"][-1] -= time.time()
+        self.tcomp["Iceflow Emul"][-1] *= -1
+ 
+##############################################################
+ 
+    def cnn(self, nb_inputs, nb_outputs):
+        """
+            Routine serve to build a convolutional neural network
+        """
+
+        inputs = tf.keras.layers.Input(shape=[None, None, nb_inputs])
+
+        conv = inputs
+        
+        # if self.config.normalize:
+        #     conv = tf.keras.layers.Normalization(axis=-1,
+        #                                          mean=[0 for i in range(nb_inputs)],
+        #                                          variance=self.norm_in)(conv)
+        
+#        initializer = tf.keras.initializers.GlorotUniform()
+
+        if self.config.activation == "lrelu":
+            activation = tf.keras.layers.LeakyReLU(alpha=0.01)
+        else:
+            activation = tf.keras.layers.ReLU()
+
+        for i in range(int(self.config.nb_layers)):
+
+            conv = tf.keras.layers.Conv2D(
+                filters=self.config.nb_out_filter,
+                kernel_size=(self.config.conv_ker_size, self.config.conv_ker_size),
+ #               kernel_initializer = initializer,
+                padding="same",
+            )(conv)
+
+            conv = activation(conv)
+
+            conv = tf.keras.layers.Dropout(self.config.dropout_rate)(conv)
+
+        outputs = conv
+
+        outputs = tf.keras.layers.Conv2D(filters=nb_outputs, \
+                                         kernel_size=(1, 1), \
+#                                         kernel_initializer = initializer, \
+                                         activation=None)(outputs)
+
+        # if self.config.normalize:
+        #     outputs = tf.keras.layers.Normalization(axis=-1,
+        #                                             mean=[0 for i in range(nb_outputs)],
+        #                                             variance=self.norm_out)(outputs)
+
+        return tf.keras.models.Model(inputs=inputs, outputs=outputs)
+     
+    def unet(self, nb_inputs, nb_outputs):
+        """
+            Routine serve to define a UNET network from keras_unet_collection
+        """
+
+        from keras_unet_collection import models
+
+        layers = np.arange(int(self.config.nb_blocks))
+
+        number_of_filters = [
+            self.config.nb_out_filter * 2 ** (layers[i]) for i in range(len(layers))
+        ]
+
+        return models.unet_2d(
+            (None, None, nb_inputs),
+            number_of_filters,
+            n_labels=nb_outputs,
+            stack_num_down=2,
+            stack_num_up=2,
+            activation="LeakyReLU",
+            output_activation=None,
+            batch_norm=False,
+            pool="max",
+            unpool=False,
+            name="unet",
+        )
+    
+    def splitX(self,X,nbmax):
+        
+        XX  = []
+        ny = X.shape[1]
+        nx = X.shape[2]
+        sy = (ny//nbmax+1)
+        sx = (nx//nbmax+1)
+        ly = int(ny/sy)
+        lx = int(nx/sx)
+        
+        for i in range(sx):
+            for j in range(sy):
+                XX.append(X[0,j*ly:(j+1)*ly,i*lx:(i+1)*lx,:])
+ 
+        return tf.stack(XX,axis=0)
+    
+    def update_iceflow_v2(self):
+        
+        self.update_iceflow_emulator() 
+        self.update_iceflow_emulated() 
+     
+    def update_iceflow_emulator(self):
+        """
+              update_iceflow_emulator
+        """ 
+        
+        if not hasattr(self, "already_called_update_iceflow_emulator"):
+
+            self.tcomp["Retrain"] = []
+            self.already_called_update_iceflow_emulator = True
+#            self.tlast_iceflow_emulator = -1.0e5000
+            
+            self.update_iceflow_emulated() # this permits to initialize the emulator
+ 
+           # fix change in TF btw version <=10 and version >=11
+            if int(tf.__version__.split('.')[1])<=10:
+                self.opti_retrain = tf.keras.optimizers.Adam(learning_rate=self.config.retrain_iceflow_emulator_lr)
+            else:
+                self.opti_retrain = tf.keras.optimizers.legacy.Adam(learning_rate=self.config.retrain_iceflow_emulator_lr)
+            
+        #if ((self.t.numpy() - self.tlast_iceflow_emulator) >= self.config.retrain_iceflow_emulator_freq):
+            
+        if self.config.retrain_iceflow_emulator_freq>0:
+
+            if self.it%self.config.retrain_iceflow_emulator_freq==0:
+                    
+                self.tcomp["Retrain"].append(time.time())
+                         
+                XX = tf.expand_dims( tf.stack([vars(self)[f] for f in self.fieldin ],axis=-1), axis=0)
+                
+                X = self.splitX(XX,self.config.retrain_iceflow_emulator_framesizemax)
+                
+                self.COST_emulator = 0
+                
+                MISFIT = []
+                
+                for i in range(X.shape[0]):
+                
+                    for epoch in range(self.config.retrain_iceflow_emulator_nbit):
+                          
+                        with tf.GradientTape() as t:
+                 
+                            Y = self.iceflow_model(X[i:i+1,:,:,:])
+                             
+                            COST = self.iceflow_energy_XY(X[i:i+1,:,:,:],Y) 
+                            
+                            self.COST_emulator += COST.numpy()
+                            
+                            MISFIT.append(self.COST_emulator)
+
+                            if (epoch+1)%1000==0:
+                                
+                                print('Retrain : ', epoch, COST.numpy(), tf.norm(Y).numpy() )
+                             
+                            # if stop_if_no_decrease:
+                            #     if epoch>0:
+                            #         if MISFIT[-1]>=MISFIT[-2]:
+                            #             break
+                             
+                        grads = t.gradient(COST, self.iceflow_model.trainable_variables)
+                        
+                        self.opti_retrain.apply_gradients(zip(grads, self.iceflow_model.trainable_variables))
+                        
+
+    
+                self.tlast_iceflow_emulator = self.t.numpy()
+        
+                self.tcomp["Retrain"][-1] -= time.time()
+                self.tcomp["Retrain"][-1] *= -1
+  
+    def save_iceflow_model(self):
+        
+        directory =  os.path.join(self.config.working_dir, "iceflow-model")
+         
+        if os.path.exists(directory):
+            shutil.rmtree(directory)
+
+        os.mkdir(directory)        
+
+        self.iceflow_model.save(os.path.join(directory, "model.h5"))
+  
+        fid = open(os.path.join(directory, "fieldin.dat"), "w")
+        for key in self.fieldin:
+            fid.write("%s %.1f \n" % (key, 1.0))
+        fid.close()
+            
+        fid = open(os.path.join(directory, "vert_grid.dat"), "w")
+        fid.write("%4.0f  %s \n" % (self.config.Nz,'# number of vertical grid point (Nz)'))
+        fid.write("%2.2f  %s \n" % (self.config.vert_spacing,'# param for vertical spacing (vert_spacing)'))
+        fid.close()
+        
+    def computemisfit(self,thk,U):
+          
+        VEL = tf.stack([ tf.reduce_sum( self.vert_weight*U[0] , axis=0)  , \
+                         tf.reduce_sum( self.vert_weight*U[1] , axis=0) ], axis=0) 
+ 
+        nl1diff = tf.reduce_sum(tf.where(thk>1,tf.abs(VEL),0)) / (2*np.sum(thk>1)) 
+
+        return nl1diff.numpy()
 
     ####################################################################################
     ####################################################################################
@@ -1648,6 +2508,164 @@ class Igm:
 
         self.tcomp["Tracking"][-1] -= time.time()
         self.tcomp["Tracking"][-1] *= -1
+        
+    def update_particles_v2(self):
+        """
+        IGM includes a particle tracking routine, which can compute a large number of trajectories (as it is implemented with TensorFlow to run in parallel) in live time during the forward model run. The routine produces some seeding of particles (by default in the accumulation area at regular intervals), and computes the time trajectory of the resulting particle in time advected by the velocity field in 3D. There are currently 2 implementations:
+            
+        * 'simple', Horizontal and vertical directions are treated differently: i) In the horizontal plan, particles are advected with the horizontal velocity field (interpolated bi-linearly). The positions are recorded in vector (glacier.xpos,glacier.ypos). ii) In the vertical direction, particles are tracked along the ice column scaled between 0 and 1 (0 at the bed, 1 at the top surface). The relative position along the ice column is recorded in vector glacier.rhpos (same dimension as glacier.xpos and iglaciergm.ypos). Particles are always initialized at 1 (assumed to be on the surface). The evolution of the particle within the ice column through time is computed according to the surface mass balance: the particle deepens when the surface mass balance is positive (then igm.rhpos decreases), and re-emerge when the surface mass balance is negative.  
+    
+        * '3d', The vertical velocity is reconsructed by integrating the divergence of the horizontal velocity, this permits in turn to perform 3D particle tracking. self.zpos is the z- position within the ice.
+        
+        Note that in both case, the velocity in the ice layer is reconstructed from bottom and surface one assuming 4rth order polynomial profile (SIA-like)
+        
+        To include this feature, make sure:
+        
+        * To adapt the seeding to your need. You may keep the default seeding in the accumulation area setting the seeding frequency with igm.config.frequency_seeding and the seeding density glacier.config.density_seeding. Alternatively, you may define your own seeding strategy (e.g. seeding close to rock walls/nunataks). To do so, you may redefine the function seeding_particles.
+        
+        * At each time step, the weight of surface debris contains in each cell the 2D horizontal grid is computed, and stored in variable igm.weight_particles.
+        
+        * You may visualize the moving particles in update_plot(). 
+        
+        * Particles trajectories are saved in folder 'trajectory', and are organized by seeding times.
+        
+        Check at the example aletsch-1880-2100 for an example of particle tracking.
+        """
+
+        import tensorflow_addons as tfa
+
+        if self.config.verbosity == 1:
+            print("Update TRACKING at time : ", self.t)
+
+        if not hasattr(self, "already_called_update_tracking"):
+            self.already_called_update_tracking = True
+            self.tlast_seeding = -1.0e5000
+            self.tcomp["Tracking"] = []
+
+            # initialize trajectories
+            self.xpos = tf.Variable([])
+            self.ypos = tf.Variable([])
+            self.zpos = tf.Variable([])
+            self.rhpos = tf.Variable([])
+            self.wpos = tf.Variable([]) # this is to give a weight to the particle
+
+            # build the gridseed
+            self.gridseed = np.zeros_like(self.thk) == 1
+            rr = int(1.0 / self.config.density_seeding)
+            self.gridseed[::rr, ::rr] = True
+
+            # create trajectory folder to store outputs
+            directory = os.path.join(self.config.working_dir, "trajectories")
+            if os.path.exists(directory):
+                shutil.rmtree(directory)
+            os.mkdir(directory)
+            
+            os.system('echo rm -r '+ os.path.join(self.config.working_dir, "trajectories") + ' >> clean.sh')
+  
+        if (self.t.numpy() - self.tlast_seeding) >= self.config.frequency_seeding:
+            self.seeding_particles()
+
+            # merge the new seeding points with the former ones
+            self.xpos = tf.Variable(tf.concat([self.xpos, self.nxpos], axis=-1))
+            self.ypos = tf.Variable(tf.concat([self.ypos, self.nypos], axis=-1))
+            self.zpos = tf.Variable(tf.concat([self.zpos, self.nzpos], axis=-1))
+            self.rhpos = tf.Variable(tf.concat([self.rhpos, self.nrhpos], axis=-1))
+            self.wpos = tf.Variable(tf.concat([self.wpos, self.nwpos], axis=-1))
+
+            self.tlast_seeding = self.t.numpy() 
+
+        self.tcomp["Tracking"].append(time.time())
+        
+        self.update_write_trajectories()
+
+        # find the indices of trajectories
+        # these indicies are real values to permit 2D interpolations
+        i = (self.xpos - self.x[0]) / self.dx
+        j = (self.ypos - self.y[0]) / self.dx
+
+        indices = tf.expand_dims(
+            tf.concat(
+                [tf.expand_dims(j, axis=-1), tf.expand_dims(i, axis=-1)], axis=-1
+            ),
+            axis=0,
+        )
+
+        u = tfa.image.interpolate_bilinear(
+            tf.expand_dims(self.U[0], axis=-1),
+            indices,
+            indexing="ij",
+        )[:, :, 0]
+
+        v = tfa.image.interpolate_bilinear(
+            tf.expand_dims(self.U[1], axis=-1),
+            indices,
+            indexing="ij",
+        )[:, :, 0]
+
+        othk = tfa.image.interpolate_bilinear(
+            tf.expand_dims(tf.expand_dims(self.thk, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
+        
+        topg = tfa.image.interpolate_bilinear(
+            tf.expand_dims(tf.expand_dims(self.topg, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
+         
+        smb = tfa.image.interpolate_bilinear(
+            tf.expand_dims(tf.expand_dims(self.smb, axis=0), axis=-1),
+            indices,
+            indexing="ij",
+        )[0, :, 0]
+        
+        if self.config.tracking_method=='simple':
+
+            nthk = othk + smb * self.dt  # new ice thicnkess after smb update
+
+            # adjust the relative height within the ice column with smb
+            self.rhpos = (
+                tf.where(
+                    nthk > 0.1, tf.clip_by_value(self.rhpos * othk / nthk, 0, 1), 1
+                )
+            )
+            
+            # the 2 following line inverse the following relation to find I from rhs
+            
+            # weight  = ((zeta / self.config.vert_spacing) * (1.0 + (self.config.vert_spacing - 1.0) * zeta))
+            
+            DET = tf.sqrt(1+4*(self.config.vert_spacing-1)*self.config.vert_spacing*self.rhpos)
+            temp = self.config.Nz*(DET.numpy()-1)/(2*(self.config.vert_spacing-1))
+            I = np.minimum(temp.astype(int),self.config.Nz-1)
+            ind = [[j,i] for i,j in enumerate(I)]
+            
+            if len(I)>0:
+                
+                self.xpos = (self.xpos + self.dt * tf.gather_nd(u,ind))  # forward euler
+                self.ypos = (self.ypos + self.dt * tf.gather_nd(v,ind))  # forward euler 
+                self.zpos = ( topg + nthk * self.rhpos  )
+            
+        elif self.config.tracking_method=='3d':
+            
+            print('NOT IMPLEMTEDN 3D')
+
+        indices = tf.concat(
+            [
+                tf.expand_dims(tf.cast(j, dtype="int32"), axis=-1),
+                tf.expand_dims(tf.cast(i, dtype="int32"), axis=-1),
+            ],
+            axis=-1,
+        )
+        updates = tf.cast(tf.where(self.rhpos == 1, self.wpos, 0), dtype="float32")
+        
+        # this computes the sum of the weight of particles on a 2D grid
+        self.weight_particles = tf.tensor_scatter_nd_add(
+            tf.zeros_like(self.thk), indices, updates
+        )
+
+        self.tcomp["Tracking"][-1] -= time.time()
+        self.tcomp["Tracking"][-1] *= -1
             
     def update_write_trajectories(self):
 
@@ -2011,7 +3029,7 @@ class Igm:
     ####################################################################################
     ####################################################################################
     ####################################################################################
-    #                               OPTI
+    #                               OPTI (VERSION 1)
     ####################################################################################
     ####################################################################################
     ####################################################################################
@@ -3494,6 +4512,720 @@ class Igm:
             plt.close("all")
             
             os.system('echo rm '+ os.path.join(self.config.working_dir, "*.png") + ' >> clean.sh')
+            
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+    #                               OPTI (VERSION 2)
+    ####################################################################################
+    ####################################################################################
+    ####################################################################################
+     
+    def read_config_param_optimize_v2(self):
+        
+        self.parser.add_argument(
+            "--opti_regu_param_slidingco",
+            type=float,
+            default=10,
+            help="Regularization weight for the strflowctrl field in the optimization",
+        )
+        self.parser.add_argument(
+            "--opti_slidingco_std",
+            type=float,
+            default=5000.0,
+            help="Confidence/STD of slidingco",
+        )
+        self.parser.add_argument(
+            "--opti_thr_slidingco",
+            type=float,
+            default=78000.0,
+            help="TARGET SLIDINGCO",
+        )
+        self.parser.add_argument(
+            "--opti_step_size_v2",
+            type=float,
+            default=0.25,
+            help="Step size for the optimization (version 2)",
+        )
+         
+    def optimize_v2(self):
+        """
+        This function does the data assimilation (inverse modelling) to optimize thk, strflowctrl ans usurf from data
+        Check at this [page](https://github.com/jouvetg/igm/blob/main/doc/Inverse-modeling.md)
+        """
+
+        self.initialize_iceflow()
+
+        ###### PERFORM CHECKS PRIOR OPTIMIZATIONS
+
+        # make sure this condition is satisfied
+        assert ("usurf" in self.config.opti_cost) == (
+            "usurf" in self.config.opti_control
+        )
+  
+        # make sure that there are lease some profiles in thkobs
+        if "thk" in self.config.opti_cost:
+            assert not tf.reduce_all(tf.math.is_nan(self.thkobs))
+
+        ###### PREPARE DATA PRIOR OPTIMIZATIONS
+
+        if hasattr(self, "uvelsurfobs") & hasattr(self, "vvelsurfobs"):
+            self.velsurfobs = tf.stack([self.uvelsurfobs, self.vvelsurfobs], axis=-1)
+
+        if "divfluxobs" in self.config.opti_cost:
+            self.divfluxobs = self.smb - self.dhdt
+
+        if not self.config.opti_smooth_anisotropy_factor == 1:
+            self.compute_flow_direction_for_anisotropic_smoothing()
+
+        if hasattr(self, "thkinit"):
+            self.thk = (self.thkinit)
+        else:
+            self.thk = (tf.zeros_like(self.thk))
+
+        if self.config.opti_init_zero_thk:
+            self.thk = (tf.zeros_like(self.thk))
+
+        ###### PREPARE OPIMIZER
+
+        if int(tf.__version__.split('.')[1])<=10:
+            optimizer = tf.keras.optimizers.Adam(learning_rate=self.config.opti_step_size_v2)
+            opti_retrain = tf.keras.optimizers.Adam(learning_rate=self.config.retrain_iceflow_emulator_lr) 
+        else:
+            optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=self.config.opti_step_size_v2)
+            opti_retrain = tf.keras.optimizers.legacy.Adam(learning_rate=self.config.retrain_iceflow_emulator_lr)  
+  
+        ###### PREPARE VARIABLES TO OPTIMIZE
+ 
+        self.costs = []
+
+        self.tcomp["Optimize"] = []
+        
+        sc = {}
+        sc["thk"]       = 1
+        sc["usurf"]     = 1
+        sc["slidingco"] = 1000
+        
+        for f in self.config.opti_control:
+            vars()[f] = tf.Variable(vars(self)[f]/sc[f])
+ 
+        # main loop
+        for i in range(self.config.opti_nbitmax):
+
+            with tf.GradientTape() as t, tf.GradientTape() as s:
+
+                self.tcomp["Optimize"].append(time.time())
+
+                # is necessary to remember all operation to derive the gradients w.r.t. control variables
+                for f in self.config.opti_control:
+                    t.watch(vars()[f])
+                    
+                for f in self.config.opti_control:
+                    vars(self)[f] =  vars()[f]*sc[f]
+  
+                # build input of the emulator               
+                X = tf.expand_dims( tf.stack(
+                    [ tf.pad(vars(self)[f], self.PAD, "CONSTANT") for f in self.fieldin ],
+                                             axis=-1), axis=0 )
+
+                # evalutae th ice flow emulator
+                Y = self.iceflow_model(X)
+
+                # get the dimensions of the working array
+                Ny, Nx = self.thk.shape
+                
+                N    = self.config.Nz  
+                
+                # self.U = self.Y_to_U(Y[:,:Ny,:Nx,:])
+                
+                # self.update_2d_iceflow_variables()
+                
+                self.uvelsurf = Y[0, :Ny, :Nx, N-1]   
+                self.vvelsurf = Y[0, :Ny, :Nx, 2*N-1]   
+                
+                self.ubar = tf.reduce_mean(Y[0, :Ny, :Nx, :N],axis=-1)  
+                self.vbar = tf.reduce_mean(Y[0, :Ny, :Nx, N:],axis=-1)  
+                  
+                self.velsurf = tf.stack([self.uvelsurf, self.vvelsurf], axis=-1)  # NOT normalized vars
+
+                # misfit between surface velocity
+                if "velsurf" in self.config.opti_cost:
+                    ACT = ~tf.math.is_nan(self.velsurfobs)
+                    COST_U = 0.5 * tf.reduce_mean(
+                        ( (self.velsurfobs[ACT] - self.velsurf[ACT]) / self.config.opti_velsurfobs_std )**2
+                    )
+                else:
+                    COST_U = tf.Variable(0.0)
+
+                # misfit between ice thickness profiles
+                if "thk" in self.config.opti_cost:
+                    if self.config.thk_profiles_file == "":
+                        ACT = ~tf.math.is_nan(self.thkobs)
+                        COST_H = 0.5 * tf.reduce_mean(
+                            ( (self.thkobs[ACT]  - self.thk[ACT]) / self.config.opti_thkobs_std )**2
+                        )
+                else:
+                    COST_H = tf.Variable(0.0)
+
+                # misfit divergence of the flux
+                if ("divfluxobs" in self.config.opti_cost) | ("divfluxfcz" in self.config.opti_cost):
+
+                    divflux = self.compute_divflux(self.ubar, self.vbar, self.thk, self.dx, self.dx )
+
+                    if "divfluxfcz" in self.config.opti_cost:
+                        ACT = self.icemaskobs > 0.5
+                        if i % 10 == 0:
+                            # his does not need to be comptued any iteration as this is expensive
+                            res = stats.linregress( self.usurf[ACT], divflux[ACT] )  # this is a linear regression (usually that's enough)
+                        # or you may go for polynomial fit (more gl, but may leads to errors)
+                        #  weights = np.polyfit(self.usurf[ACT],divflux[ACT], 2)
+                        divfluxtar = tf.where( ACT, res.intercept + res.slope * self.usurf, 0.0 )
+                    #   divfluxtar = tf.where(ACT, np.poly1d(weights)(self.usurf) , 0.0 )
+                    else:
+                        divfluxtar = self.divfluxobs
+
+                    ACT = self.icemaskobs > 0.5
+                    COST_D = 0.5 * tf.reduce_mean(
+                        ( (divfluxtar[ACT] - divflux[ACT]) / self.config.opti_divfluxobs_std )**2 
+                    )
+
+                else:
+                    COST_D = tf.Variable(0.0)
+
+                # misfit between top ice surfaces
+                if "usurf" in self.config.opti_cost:
+                    ACT = self.icemaskobs > 0.5
+                    COST_S = 0.5 * tf.reduce_mean(
+                        ( (self.usurf[ACT] - self.usurfobs[ACT]) / self.config.opti_usurfobs_std )**2
+                    )
+                else:
+                    COST_S = tf.Variable(0.0)
+
+                # force usurf = usurf - topg
+                if "topg" in self.config.opti_cost:
+                    ACT = self.icemaskobs == 1
+                    COST_T = 10 ** 10 * tf.reduce_mean(
+                        ( self.usurf[ACT] - self.thk[ACT] - self.topg[ACT] )**2
+                    )
+                else:
+                    COST_T = tf.Variable(0.0)
+
+                # force zero thikness outisde the mask
+                if "icemask" in self.config.opti_cost:
+                    COST_O = 10 ** 10 * tf.math.reduce_mean(
+                        tf.where(self.icemaskobs > 0.5, 0.0, self.thk ** 2)
+                    )
+                else:
+                    COST_O = tf.Variable(0.0)
+
+                # Here one enforces non-negative ice thickness, and possibly zero-thickness in user-defined ice-free areas.
+                if "thk" in self.config.opti_control:
+                    COST_HPO = 10 ** 10 * tf.math.reduce_mean(
+                        tf.where(self.thk >= 0, 0.0, self.thk ** 2)
+                    )
+                else:
+                    COST_HPO = tf.Variable(0.0)
+
+                # Make sur to keep reasonable values for slidingco
+                if "slidingco" in self.config.opti_control:
+                    COST_STR = 0.5 * tf.reduce_mean(
+                        ( (self.slidingco - self.config.opti_thr_slidingco) / self.config.opti_slidingco_std)**2
+                    )
+                else:
+                    COST_STR = tf.Variable(0.0)
+
+                # Here one adds a regularization terms for the ice thickness to the cost function
+                if "thk" in self.config.opti_control:
+                    if self.config.opti_smooth_anisotropy_factor == 1:
+                        dbdx = self.thk[:, 1:] - self.thk[:, :-1]
+                        dbdy = self.thk[1:, :] - self.thk[:-1, :]
+                        REGU_H = (self.config.opti_regu_param_thk/(1000**2)) * (
+                            tf.nn.l2_loss(dbdx) + tf.nn.l2_loss(dbdy)
+                        )
+                    else:
+                        dbdx = self.thk[:, 1:] - self.thk[:, :-1]
+                        dbdx = (dbdx[1:, :] + dbdx[:-1, :]) / 2.0
+                        dbdy = self.thk[1:, :] - self.thk[:-1, :]
+                        dbdy = (dbdy[:, 1:] + dbdy[:, :-1]) / 2.0
+                        REGU_H = (self.config.opti_regu_param_thk/(1000**2)) * (
+                            tf.nn.l2_loss((dbdx * self.flowdirx + dbdy * self.flowdiry))
+                            + self.config.opti_smooth_anisotropy_factor
+                            * tf.nn.l2_loss(
+                                (dbdx * self.flowdiry - dbdy * self.flowdirx)
+                            )
+                            - self.config.opti_convexity_weight
+                            * tf.math.reduce_sum(self.thk)
+                        )
+                else:
+                    REGU_H = tf.Variable(0.0)
+
+                # Here one adds a regularization terms for slidingco to the cost function
+                if "slidingco" in self.config.opti_control:
+                    dadx = tf.math.abs(self.slidingco[:, 1:] - self.slidingco[:, :-1])
+                    dady = tf.math.abs(self.slidingco[1:, :] - self.slidingco[:-1, :])
+                    dadx = tf.where(
+                        (self.icemaskobs[:, 1:] > 0.5) & (self.icemaskobs[:, :-1] > 0.5), dadx, 0.0,
+                    )
+                    dady = tf.where(
+                        (self.icemaskobs[1:, :] > 0.5) & (self.icemaskobs[:-1, :] > 0.5), dady, 0.0,
+                    )
+                    REGU_A = (self.config.opti_regu_param_slidingco/(10000**2)) * (
+                        tf.nn.l2_loss(dadx) + tf.nn.l2_loss(dady)
+                    )
+                else:
+                    REGU_A = tf.Variable(0.0)
+
+                # sum all component into the main cost function
+                COST = COST_U + COST_H + COST_D + COST_S + COST_T + COST_O + COST_HPO + COST_STR + REGU_H + REGU_A
+
+                vol = ( np.sum(self.thk) * (self.dx ** 2) / 10 ** 9 )
+                
+                ################
+                
+                COST_GLEN = self.iceflow_energy_XY(X,Y)
+                
+                grads = s.gradient(COST_GLEN, self.iceflow_model.trainable_variables)
+                
+                opti_retrain.apply_gradients(zip(grads, self.iceflow_model.trainable_variables))
+
+                ###############
+                
+                if i % self.config.opti_output_freq == 0:
+                    print(
+                        " OPTI, step %5.0f , ICE_VOL: %7.2f , COST_U: %7.2f , COST_H: %7.2f , COST_D : %7.2f , COST_S : %7.2f , REGU_H : %7.2f , REGU_A : %7.2f , COST_GLEN : %7.2f "
+                        % ( i, vol, COST_U.numpy(), COST_H.numpy(), COST_D.numpy(), COST_S.numpy(), REGU_H.numpy(), REGU_A.numpy(), COST_GLEN.numpy())
+                    )
+
+                self.costs.append(
+                    [ COST_U.numpy(), COST_H.numpy(), COST_D.numpy(), COST_S.numpy(), REGU_H.numpy(), REGU_A.numpy(), COST_GLEN.numpy() ]
+                )
+                
+                #################
+
+                var_to_opti = []
+                for f in self.config.opti_control:
+                    var_to_opti.append(vars()[f])
+                 
+                # Compute gradient of COST w.r.t. X
+                grads = tf.Variable(t.gradient(COST, var_to_opti))
+  
+                # this serve to restict the optimization of controls to the mask
+                for ii in range(grads.shape[0]):
+                    grads[ii].assign(tf.where((self.icemaskobs > 0.5), grads[ii], 0))
+
+                # One step of descent -> this will update input variable X
+                optimizer.apply_gradients(
+                    zip([grads[i] for i in range(grads.shape[0])], var_to_opti)
+                )
+                 
+                ###################
+
+                # get back optimized variables in the pool of self.variables
+                if "thk" in self.config.opti_control:
+                    self.thk = tf.where(self.thk < 0.01, 0, self.thk)
+
+                self.divflux = self.compute_divflux(
+                    self.ubar, self.vbar, self.thk, self.dx, self.dx
+                )
+
+                self.compute_rms_std_optimization(i)
+
+                self.tcomp["Optimize"][-1] -= time.time()
+                self.tcomp["Optimize"][-1] *= -1
+
+                if i % self.config.opti_output_freq == 0:
+                    self.update_plot_inversion_v2(i, self.config.plot_live)
+                    self.update_ncdf_optimize_v2(i)
+                # self.update_plot_profiles(i,plot_live)
+
+                # stopping criterion: stop if the cost no longer decrease
+                # if i>self.config.opti_nbitmin:
+                #     cost = [c[0] for c in costs]
+                #     if np.mean(cost[-10:])>np.mean(cost[-20:-10]):
+                #         break;
+                
+        for f in self.config.opti_control:
+            vars(self)[f] =  vars()[f]*sc[f]
+
+        # now that the ice thickness is optimized, we can fix the bed once for all!
+        self.topg = (self.usurf - self.thk)
+
+        #self.output_ncdf_optimize_final_v2()
+
+        self.plot_cost_functions_v2(self.costs, self.config.plot_live)
+
+        np.savetxt(
+            os.path.join(self.config.working_dir, "costs.dat"),
+            np.stack(self.costs),
+            fmt="%.10f",
+            header="        COST_U        COST_H      COST_D       COST_S       REGU_H       REGU_A          HPO           COSTGLEN ",
+        )
+
+        np.savetxt(
+            os.path.join(self.config.working_dir, "rms_std.dat"),
+            np.stack(
+                [
+                    self.rmsthk, self.stdthk, self.rmsvel, self.stdvel,
+                    self.rmsdiv, self.stddiv, self.rmsusurf, self.stdusurf,
+                ],
+                axis=-1,
+            ),
+            fmt="%.10f",
+            header="        rmsthk      stdthk       rmsvel       stdvel       rmsdiv       stddiv       rmsusurf       stdusurf",
+        )
+
+        np.savetxt(
+            os.path.join(self.config.working_dir, "slidingco.dat"),
+            np.array(
+                [
+                    np.mean(self.slidingco[self.icemaskobs > 0.5]),
+                    np.std(self.slidingco[self.icemaskobs > 0.5]),
+                ]
+            ),
+            fmt="%.3f",
+        )
+
+        np.savetxt(
+            os.path.join(self.config.working_dir, "volume.dat"),
+            np.array([np.sum(self.thk) * self.dx * self.dx / (10 ** 9)]),
+            fmt="%.3f",
+        )
+
+        np.savetxt(
+            os.path.join(self.config.working_dir, "tcompoptimize.dat"),
+            np.array([np.sum([f for f in self.tcomp["Optimize"]])]),
+            fmt="%.3f",
+        )
+
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "slidingco.dat") + ' >> clean.sh')        
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "rms_std.dat") + ' >> clean.sh')        
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "costs.dat") + ' >> clean.sh')
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "volume.dat") + ' >> clean.sh')
+        os.system('echo rm '+ os.path.join(self.config.working_dir, "tcompoptimize.dat") + ' >> clean.sh')
+
+    def update_ncdf_optimize_v2(self, it):
+        """
+        Initialize and write the ncdf optimze file
+        """
+
+        if self.config.verbosity == 1:
+            print("Initialize  and write NCDF output Files")
+
+        # if "arrhenius" in self.config.opti_vars_to_save:
+        #     self.arrhenius = tf.where(
+        #         self.strflowctrl <= self.config.opti_thr_strflowctrl,
+        #         self.strflowctrl,
+        #         self.config.opti_thr_strflowctrl,
+        #     )
+
+        # if "slidingco" in self.config.opti_vars_to_save:
+        #     self.slidingco = tf.where(
+        #         self.strflowctrl <= self.config.opti_thr_strflowctrl,
+        #         0,
+        #         self.strflowctrl - self.config.opti_thr_strflowctrl,
+        #     )
+
+        if "topg" in self.config.opti_vars_to_save:
+            self.topg = (self.usurf - self.thk)
+
+        if "velsurf_mag" in self.config.opti_vars_to_save:
+            self.velsurf_mag = self.getmag(self.uvelsurf, self.vvelsurf)
+
+        if "velsurfobs_mag" in self.config.opti_vars_to_save:
+            self.velsurfobs_mag = self.getmag(self.uvelsurfobs, self.vvelsurfobs)
+
+        if it == 0:
+
+            nc = Dataset(
+                os.path.join(self.config.working_dir, "optimize.nc"),
+                "w",
+                format="NETCDF4",
+            )
+
+            nc.createDimension("iterations", None)
+            E = nc.createVariable("iterations", np.dtype("float32").char, ("iterations",))
+            E.units = "None"
+            E.long_name = "iterations"
+            E.axis = "ITERATIONS"
+            E[0] = it
+
+            nc.createDimension("y", len(self.y))
+            E = nc.createVariable("y", np.dtype("float32").char, ("y",))
+            E.units = "m"
+            E.long_name = "y"
+            E.axis = "Y"
+            E[:] = self.y.numpy()
+
+            nc.createDimension("x", len(self.x))
+            E = nc.createVariable("x", np.dtype("float32").char, ("x",))
+            E.units = "m"
+            E.long_name = "x"
+            E.axis = "X"
+            E[:] = self.x.numpy()
+
+            for var in self.config.opti_vars_to_save:
+
+                E = nc.createVariable(
+                    var, np.dtype("float32").char, ("iterations", "y", "x")
+                )
+                E[0, :, :] = vars(self)[var].numpy()
+
+            nc.close()
+            
+            os.system('echo rm '+ os.path.join(self.config.working_dir, "optimize.nc") + ' >> clean.sh')
+
+        else:
+
+            nc = Dataset(
+                os.path.join(self.config.working_dir, "optimize.nc"),
+                "a",
+                format="NETCDF4",
+            )
+
+            d = nc.variables["iterations"][:].shape[0]
+
+            nc.variables["iterations"][d] = it
+
+            for var in self.config.opti_vars_to_save:
+                nc.variables[var][d, :, :] = vars(self)[var].numpy()
+
+            nc.close()
+
+    def output_ncdf_optimize_final_v2(self):
+        """
+        Write final geology after optimizing
+        """
+
+        if self.config.verbosity == 1:
+            print("Write the final geology ncdf file after optimization")
+
+        nc = Dataset(
+            os.path.join(self.config.working_dir, self.config.observation_file), "r"
+        )
+        varori = [v for v in nc.variables]
+        nc.close()
+
+        varori.remove("x")
+        varori.remove("y")
+        if not "strflowctrl" in varori:
+            varori.append("strflowctrl")
+        if not "arrhenius" in varori:
+            varori.append("arrhenius")
+        if not "slidingco" in varori:
+            varori.append("slidingco")
+        if not "thk" in varori:
+            varori.append("thk")
+        if not "usurf" in varori:
+            varori.append("usurf")
+        if not "icemask" in varori:
+            varori.append("icemask")
+
+        # self.arrhenius = tf.where(
+        #     self.strflowctrl <= self.config.opti_thr_strflowctrl,
+        #     self.strflowctrl,
+        #     self.config.opti_thr_strflowctrl,
+        # )
+        # self.slidingco = tf.where(
+        #     self.strflowctrl <= self.config.opti_thr_strflowctrl,
+        #     0,
+        #     self.strflowctrl - self.config.opti_thr_strflowctrl,
+        # )
+        self.velsurf_mag = self.getmag(self.uvelsurf, self.vvelsurf)
+
+        self.icemask = tf.where(
+            self.thk > 1.0, tf.ones_like(self.thk), tf.zeros_like(self.thk)
+        )
+
+        nc = Dataset(
+            os.path.join(self.config.working_dir, self.config.geology_optimized_file),
+            "w",
+            format="NETCDF4",
+        )
+
+        nc.createDimension("y", len(self.y))
+        E = nc.createVariable("y", np.dtype("float32").char, ("y",))
+        E.units = "m"
+        E.long_name = "y"
+        E.axis = "Y"
+        E[:] = self.y.numpy()
+
+        nc.createDimension("x", len(self.x))
+        E = nc.createVariable("x", np.dtype("float32").char, ("x",))
+        E.units = "m"
+        E.long_name = "x"
+        E.axis = "X"
+        E[:] = self.x.numpy()
+
+        for var in varori:
+
+            if hasattr(self, var):
+                E = nc.createVariable(var, np.dtype("float32").char, ("y", "x"))
+                #                E.long_name = self.var_info[var][0]
+                #                E.units     = self.var_info[var][1]
+                E[:, :] = vars(self)[var].numpy()
+
+        nc.close()
+        
+        os.system('echo rm '+ os.path.join(self.config.working_dir, self.config.geology_optimized_file) + ' >> clean.sh')
+
+    def plot_cost_functions_v2(self, costs, plot_live):
+
+        costs = np.stack(costs)
+
+        for i in range(costs.shape[1]):
+            costs[:, i] -= np.min(costs[:, i])
+            costs[:, i] /= np.max(costs[:, i])
+
+        fig = plt.figure(figsize=(10, 10))
+        plt.plot(costs[:, 0], "-k", label="COST U")
+        plt.plot(costs[:, 1], "-r", label="COST H")
+        plt.plot(costs[:, 2], "-b", label="COST D")
+        plt.plot(costs[:, 3], "-g", label="COST S")
+        plt.plot(costs[:, 4], "--c", label="REGU H")
+        plt.plot(costs[:, 5], "--m", label="REGU A")
+        plt.ylim(0, 1)
+        plt.legend()
+
+        if plot_live:
+            plt.show()
+        else:
+            plt.savefig(
+                os.path.join(self.config.working_dir, "convergence.png"), pad_inches=0
+            )
+            plt.close("all")
+            
+            os.system('echo rm '+ os.path.join(self.config.working_dir, "convergence.png") + ' >> clean.sh')
+
+    def update_plot_inversion_v2(self, i, plot_live):
+        """
+        Plot thickness, velocity, mand slidingco
+        """
+
+        if self.config.plot_result:
+
+            if hasattr(self, "uvelsurfobs"):
+                velsurfobs_mag = self.getmag(self.uvelsurfobs, self.vvelsurfobs).numpy()
+            else:
+                velsurfobs_mag = np.zeros_like(self.thk.numpy())
+
+            if hasattr(self, "usurfobs"):
+                usurfobs = self.usurfobs
+            else:
+                usurfobs = np.zeros_like(self.thk.numpy())
+
+            ########################################################
+
+            fig = plt.figure(figsize=(18, 13))
+
+            #########################################################
+
+            ax = fig.add_subplot(2, 3, 1)
+            extent = [self.x[0], self.x[-1], self.y[0], self.y[-1]]
+            im1 = ax.imshow(self.thk, origin="lower", extent=extent, vmin=0, vmax=800)
+            plt.colorbar(im1)
+
+            if hasattr(self, "profile"):
+                fthk = RectBivariateSpline(self.x, self.y, np.transpose(self.thk))
+                for j, p in enumerate(self.profile):
+                    if j > 0:
+                        meanfitprofile = np.mean(
+                            fthk(p[:, 1], p[:, 2], grid=False) - p[:, 3]
+                        )
+                        ax.scatter(p[:, 1], p[:, 2], c="k", s=1)
+                        ax.text(
+                            np.mean(p[:, 1]),
+                            np.mean(p[:, 2]),
+                            str(int(meanfitprofile)),
+                            fontsize=15,
+                        )
+
+            ax.set_title(
+                "THK, RMS : "
+                + str(int(self.rmsthk[-1]))
+                + ", STD : "
+                + str(int(self.stdthk[-1])),
+                size=15,
+            )
+            ax.axis("off")
+
+            #########################################################
+
+            ax = fig.add_subplot(2, 3, 2)
+            velsurf_mag = self.getmag(self.uvelsurf, self.vvelsurf).numpy()
+            im1 = ax.imshow(
+                velsurf_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)
+            )
+            plt.colorbar(im1, format="%.2f")
+            ax.set_title(
+                "MOD VEL, RMS : "
+                + str(int(self.rmsvel[-1]))
+                + ", STD : "
+                + str(int(self.stdvel[-1])),
+                size=15,
+            )
+            ax.axis("off")
+
+            ########################################################
+
+            ax = fig.add_subplot(2, 3, 3)
+            im1 = ax.imshow(self.divflux, origin="lower", vmin=-15, vmax=5)
+            plt.colorbar(im1, format="%.2f")
+            ax.set_title(
+                "MOD DIV, RMS : %5.1f , STD : %5.1f"
+                % (self.rmsdiv[-1], self.stddiv[-1]),
+                size=15,
+            )
+            ax.axis("off")
+
+            #########################################################
+
+            ax = fig.add_subplot(2, 3, 4)
+            im1 = ax.imshow(self.usurf - usurfobs, origin="lower", vmin=-10, vmax=10)
+            plt.colorbar(im1, format="%.2f")
+            ax.set_title(
+                "DELTA USURF, RMS : %5.1f , STD : %5.1f"
+                % (self.rmsusurf[-1], self.stdusurf[-1]),
+                size=15,
+            )
+            ax.axis("off")
+
+            ########################################################
+
+            ax = fig.add_subplot(2, 3, 5)
+            im1 = ax.imshow(
+                velsurfobs_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)
+            )
+            plt.colorbar(im1, format="%.2f")
+            ax.set_title("OBS VEL (TARGET)", size=15)
+            ax.axis("off")
+
+            #######################################################
+
+            ax = fig.add_subplot(2, 3, 6)
+            im1 = ax.imshow(self.slidingco, origin="lower", vmin=np.quantile(self.slidingco,0.02), \
+                                                            vmax=np.quantile(self.slidingco,0.98) )
+            plt.colorbar(im1, format="%.2f")
+            ax.set_title("slidingco", size=15)
+            ax.axis("off")
+
+            #########################################################
+
+            plt.tight_layout()
+
+            if plot_live:
+                plt.show()
+            else:
+                plt.savefig(
+                    os.path.join(
+                        self.config.working_dir, "resu-opti-" + str(i).zfill(4) + ".png"
+                    ),
+                    pad_inches=0,
+                )
+                plt.close("all")
+                
+                os.system('echo rm '+ os.path.join(self.config.working_dir, "*.png") + ' >> clean.sh')
+ 
+
 
     ####################################################################################
     ####################################################################################
