@@ -10,6 +10,10 @@ We have 1 PhD and 1 postdoc open position in glacier and landscape evolution mod
 
 IGM is a very young model, continuously developped, with limited documentation and testing. To start with, I recomand to start with examples (via colab notebooks or the example folder). If you have ideas of extensions or applications, you would like to contribute, please contact me at guillaume.jouvet at unil.ch.
 
+# New 
+
+IGM now includes a physics-informed deep learning emulator (check this [paper](https://doi.org/10.31223/X5K08Q)), which is a much more elegant and efficient training strategy than the one used previously, especially because it is much more generic and no external instructor models are needed. Users may use it by switching the version from default/original 'v1' to 'v2' via parameter _glacier.config.version_.
+
 # Overview   
 
 The Instructed Glacier Model (IGM) simulates the ice dynamics, surface mass balance, and its coupling through mass conservation to predict the evolution of glaciers, icefields, or ice sheets (Figs. 1 and 2). 
