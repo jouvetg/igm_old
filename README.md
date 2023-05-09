@@ -12,7 +12,7 @@ IGM is a very young model, continuously developped, with limited documentation a
 
 # New 
 
-IGM now includes a physics-informed deep learning emulator (check this [paper](https://doi.org/10.31223/X5K08Q)), which is a much more elegant and efficient training strategy than the one used previously, especially because it is much more generic and no external instructor models are needed. Users may use it by switching the version from default/original 'v1' to 'v2' via parameter _glacier.config.version_.
+IGM now includes a physics-informed deep learning emulator (check this [paper](https://doi.org/10.31223/X5K08Q)), which is a more elegant and efficient training strategy than the one used previously, especially because it is generic and no external instructor models are needed. Users may use it by switching the version from default/original 'v1' to 'v2' via parameter _glacier.config.version_. Check at the section 3.Workflow of the wiki and the paper for more information.
 
 # Overview   
 
