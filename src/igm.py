@@ -5343,6 +5343,103 @@ class Igm:
             self.tcomp["Outputs plot"][-1] -= time.time()
             self.tcomp["Outputs plot"][-1] *= -1
 
+    def update_plot_vs(self):
+        """
+        Plot some variables (e.g. thickness, velocity, mass balance) over time
+        """
+
+        if (self.saveresult & self.config.plot_result): 
+            
+            self.extent = [np.min(self.x),np.max(self.x),np.min(self.y),np.max(self.y)]
+
+            firstime = False
+            if not hasattr(self, "already_called_update_plot"):
+                self.already_called_update_plot = True
+                self.tcomp["Outputs plot"] = []
+                firstime = True
+
+            self.tcomp["Outputs plot"].append(time.time())
+
+            if self.config.varplot == "velbar_mag":
+                self.velbar_mag = self.getmag(self.ubar, self.vbar)
+
+            if firstime:
+
+                # enable interactive mode
+                plt.ion()
+
+                self.fig = plt.figure(dpi=200)
+                self.ax = self.fig.add_subplot(1, 1, 1)
+                self.ax.axis("off")
+                im = self.ax.imshow(
+                    tf.where(self.thk>1,vars(self)[self.config.varplot],np.nan),
+                    origin="lower",
+                    cmap="viridis",
+                    vmin=0,
+                    vmax=self.config.varplot_max,
+                    extent=self.extent
+                ) 
+                self.ip = self.ax.scatter(
+                    x=[self.x[0]],
+                    y=[self.y[0]],
+                    c=[1],
+                    vmin=0,
+                    vmax=1,
+                    s=0.5,
+                    cmap="RdBu",
+                )
+                self.ax.set_title("YEAR : " + str(self.t.numpy()), size=15)
+                self.cbar = plt.colorbar(im,label=self.config.varplot)
+#                self.ax.set_xlim(427500, 430000)
+#                self.ax.set_ylim(5142250,5147050)
+            else:
+                im = self.ax.imshow(
+                    tf.where(self.thk>1,vars(self)[self.config.varplot],np.nan),
+                    origin="lower",
+                    cmap="viridis",
+                    vmin=0,
+                    vmax=self.config.varplot_max,
+                    extent=self.extent
+                )
+                if hasattr(self,'xpos'):
+                    self.ip.set_visible(False)
+                    r = 1
+                    self.ip = self.ax.scatter(
+                        x=self.xpos[::r],
+                        y=self.ypos[::r],
+                        c=1 - self.rhpos[::r].numpy(),
+                        vmin=0,
+                        vmax=1,
+                        s=0.5,
+                        cmap="RdBu",
+                    )
+                self.ax.set_title("YEAR : " + str(self.t.numpy()), size=15)
+
+            if self.config.plot_live:
+                # re-drawing the figure
+                self.fig.canvas.draw()
+                # to flush the GUI events
+                self.fig.canvas.flush_events()
+
+            else:
+                plt.savefig(
+                    os.path.join(
+                        self.config.working_dir,
+                        self.config.varplot
+                        + "-"
+                        + str(self.t.numpy()).zfill(4)
+                        + ".png",
+                    ),
+                    bbox_inches="tight",
+                    pad_inches=0.2,
+                )
+                
+                os.system('echo rm '+ os.path.join(self.config.working_dir, "*.png") + ' >> clean.sh')
+
+            self.tcomp["Outputs plot"][-1] -= time.time()
+            self.tcomp["Outputs plot"][-1] *= -1
+
+
     def plot_computational_pie(self):
         """
         Plot to the computational time of each model components in a pie
