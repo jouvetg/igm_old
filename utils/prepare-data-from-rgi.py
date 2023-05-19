@@ -39,7 +39,11 @@ parser = argparse.ArgumentParser(
 
 parser.add_argument(
     "--RGI", type=str, default="RGI60-11.01450", help="RGI ID"
-)  # malspina RGI60-01.13696
+)  
+   # aletsch  RGI60-11.01450
+   # malspina RGI60-01.13696
+   # brady    RGI60-01.20796
+   # ethan    RGI60-01.00709
 parser.add_argument(
     "--preprocess", type=str2bool, default=True, help="Use preprocessing"
 )
@@ -92,7 +96,6 @@ parser.add_argument(
 )
 
 config = parser.parse_args()
-
 
 def oggm_util_preprocess(RGIs, config, WD="OGGM-prepro"):
 
@@ -186,7 +189,6 @@ def oggm_util(RGIs, config, WD="OGGM-dir"):
 
 ######################################
 
-
 def read_glathida(x, y, usurf, proj, path_glathida):
 
     print("read_glathida ----------------------------------")
@@ -234,23 +236,31 @@ def read_glathida(x, y, usurf, proj, path_glathida):
         df["elevation_date"].str.slice(0, 4).astype(int)
     ).abs().le(1)
     df = df[mask]
-
-    # Compute thickness relative to prescribed surface
-    xx, yy = transformer.transform(df["lon"], df["lat"])
-    bedrock = df["elevation"] - df["thickness"]
-    elevation_normalized = fsurf(xx, yy, grid=False)
-    thickness_normalized = np.maximum(elevation_normalized - bedrock, 0)
-
-    # Rasterize thickness
-    thickness_gridded = pd.DataFrame({
-        'col': np.floor((xx - np.min(x)) / (x[1] - x[0])).astype(int),
-        'row': np.floor((yy - np.min(y)) / (y[1] - y[0])).astype(int),
-        'thickness': thickness_normalized
-    }).groupby(['row', 'col'])['thickness'].mean()
-    thkobs = np.full((y.shape[0], x.shape[0]), np.nan)
-    thkobs[tuple(zip(*thickness_gridded.index))] = thickness_gridded
+    
+    if df.index.shape[0]==0:
+        print('No ice thickness profiles found')
+        thkobs = np.ones_like(usurf)
+        thkobs[:] = np.nan
+        
+    else:
+        # Compute thickness relative to prescribed surface
+        print('Nb of profiles found : ',df.index.shape[0])
+        
+        xx, yy = transformer.transform(df["lon"], df["lat"])
+        bedrock = df["elevation"] - df["thickness"]
+        elevation_normalized = fsurf(xx, yy, grid=False)
+        thickness_normalized = np.maximum(elevation_normalized - bedrock, 0)
+    
+        # Rasterize thickness
+        thickness_gridded = pd.DataFrame({
+            'col': np.floor((xx - np.min(x)) / (x[1] - x[0])).astype(int),
+            'row': np.floor((yy - np.min(y)) / (y[1] - y[0])).astype(int),
+            'thickness': thickness_normalized
+        }).groupby(['row', 'col'])['thickness'].mean()
+        thkobs = np.full((y.shape[0], x.shape[0]), np.nan)
+        thkobs[tuple(zip(*thickness_gridded.index))] = thickness_gridded
+        
     return thkobs
-
 
 ########################################################
 
@@ -262,7 +272,9 @@ else:
 print("read ncdf ----------------------------------")
 
 nc = Dataset(paths_ncdf[0], "r+")
+
 for var in nc.variables:
+    print('Variable found : ',var)
     vars()[var] = np.squeeze(nc.variables[var]).astype("float32")
     if not (var == "x") | (var == "y"):
         vars()[var] = np.flipud(vars()[var])
