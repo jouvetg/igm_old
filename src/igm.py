@@ -2509,6 +2509,23 @@ class Igm:
         self.tcomp["Tracking"][-1] -= time.time()
         self.tcomp["Tracking"][-1] *= -1
         
+    def zeta_to_rhs(self,zeta):
+
+        return ((zeta / self.config.vert_spacing) * (1.0 + (self.config.vert_spacing - 1.0) * zeta)) 
+            
+    def rhs_to_zeta(self,rhs):
+
+        if self.config.vert_spacing==1:
+            rhs=zeta
+        else:
+            DET  = tf.sqrt(1+4*(self.config.vert_spacing-1)*self.config.vert_spacing*rhs)
+            zeta = (DET-1)/(2*(self.config.vert_spacing-1))
+            
+#           temp = self.config.Nz*(DET-1)/(2*(self.config.vert_spacing-1))
+#           I=tf.cast(tf.minimum(temp-1,self.config.Nz-1),dtype='int32')
+
+        return zeta
+        
     def update_particles_v2(self):
         """
         IGM includes a particle tracking routine, which can compute a large number of trajectories (as it is implemented with TensorFlow to run in parallel) in live time during the forward model run. The routine produces some seeding of particles (by default in the accumulation area at regular intervals), and computes the time trajectory of the resulting particle in time advected by the velocity field in 3D. There are currently 2 implementations:
@@ -2630,22 +2647,43 @@ class Igm:
                     nthk > 0.1, tf.clip_by_value(self.rhpos * othk / nthk, 0, 1), 1
                 )
             )
-            
+             
+            # OLD CODE -----------------------------
             # the 2 following line inverse the following relation to find I from rhs
-            
             # weight  = ((zeta / self.config.vert_spacing) * (1.0 + (self.config.vert_spacing - 1.0) * zeta))
             
-            DET = tf.sqrt(1+4*(self.config.vert_spacing-1)*self.config.vert_spacing*self.rhpos)
-            temp = self.config.Nz*(DET.numpy()-1)/(2*(self.config.vert_spacing-1))
-            I = np.minimum(temp.astype(int),self.config.Nz-1)
-            ind = [[j,i] for i,j in enumerate(I)]
+            # DET = tf.sqrt(1+4*(self.config.vert_spacing-1)*self.config.vert_spacing*self.rhpos)
+            # temp = self.config.Nz*(DET.numpy()-1)/(2*(self.config.vert_spacing-1))
+            # I = np.minimum(temp.astype(int),self.config.Nz-1)           
+            # ind = [[j,i] for i,j in enumerate(I)]
             
-            if len(I)>0:
+            # if len(I)>0:
                 
-                self.xpos = (self.xpos + self.dt * tf.gather_nd(u,ind))  # forward euler
-                self.ypos = (self.ypos + self.dt * tf.gather_nd(v,ind))  # forward euler 
-                self.zpos = ( topg + nthk * self.rhpos  )
+            #     self.xpos = (self.xpos + self.dt * tf.gather_nd(u,ind))  # forward euler
+            #     self.ypos = (self.ypos + self.dt * tf.gather_nd(v,ind))  # forward euler 
+            #     self.zpos = ( topg + nthk * self.rhpos  )
+            # OLD CODE -----------------------------
+  
+            zeta = self.rhs_to_zeta(self.rhpos) # get the position in the column
+            I0   = tf.cast(tf.math.floor(zeta*(self.config.Nz-1)),dtype='int32') 
+            I0   = tf.minimum(I0,self.config.Nz-2) # make sure to not reach the upper-most pt
+            I1   = I0+1
+            zeta0   = tf.cast( I0/(self.config.Nz-1) ,dtype='float32')
+            zeta1   = tf.cast( I1/(self.config.Nz-1) ,dtype='float32')
+           
+            lamb = (zeta-zeta0)/(zeta1-zeta0)
             
+            ind0 = tf.transpose(tf.stack([I0,tf.range(I0.shape[0])])) 
+            ind1 = tf.transpose(tf.stack([I1,tf.range(I1.shape[0])]))
+            
+            wei = tf.zeros_like(u)
+            wei = tf.tensor_scatter_nd_add(wei, indices=ind0, updates=1-lamb)
+            wei = tf.tensor_scatter_nd_add(wei, indices=ind1, updates=lamb)
+ 
+            self.xpos = (self.xpos + self.dt * tf.reduce_sum(wei*u,axis=0))  # forward euler
+            self.ypos = (self.ypos + self.dt * tf.reduce_sum(wei*v,axis=0))  # forward euler 
+            self.zpos = topg + nthk * self.rhpos
+ 
         elif self.config.tracking_method=='3d':
             
             print('NOT IMPLEMTEDN 3D')
@@ -4245,7 +4283,7 @@ class Igm:
 
             ax = fig.add_subplot(2, 3, 1)
             extent = [self.x[0], self.x[-1], self.y[0], self.y[-1]]
-            im1 = ax.imshow(self.thk, origin="lower", extent=extent, vmin=0, vmax=800)
+            im1 = ax.imshow(self.thk, origin="lower", extent=extent, vmin=0, vmax=1400)
             plt.colorbar(im1)
 
             if hasattr(self, "profile"):
@@ -4277,7 +4315,7 @@ class Igm:
             ax = fig.add_subplot(2, 3, 2)
             velsurf_mag = self.getmag(self.uvelsurf, self.vvelsurf).numpy()
             im1 = ax.imshow(
-                velsurf_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)
+                velsurf_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)/4
             )
             plt.colorbar(im1, format="%.2f")
             ax.set_title(
@@ -4317,7 +4355,7 @@ class Igm:
 
             ax = fig.add_subplot(2, 3, 5)
             im1 = ax.imshow(
-                velsurfobs_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)
+                velsurfobs_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)/4
             )
             plt.colorbar(im1, format="%.2f")
             ax.set_title("OBS VEL (TARGET)", size=15)
@@ -4326,7 +4364,7 @@ class Igm:
             #######################################################
 
             ax = fig.add_subplot(2, 3, 6)
-            im1 = ax.imshow(self.strflowctrl, origin="lower", vmin=0, vmax=20)
+            im1 = ax.imshow(self.strflowctrl, origin="lower", vmin=0, vmax=100)
             plt.colorbar(im1, format="%.2f")
             ax.set_title("strflowctrl", size=15)
             ax.axis("off")
@@ -4850,7 +4888,7 @@ class Igm:
         # now that the ice thickness is optimized, we can fix the bed once for all!
         self.topg = (self.usurf - self.thk)
 
-        #self.output_ncdf_optimize_final_v2()
+        self.output_ncdf_optimize_final_v2()
 
         self.plot_cost_functions_v2(self.costs, self.config.plot_live)
 
@@ -5020,16 +5058,6 @@ class Igm:
         if not "icemask" in varori:
             varori.append("icemask")
 
-        # self.arrhenius = tf.where(
-        #     self.strflowctrl <= self.config.opti_thr_strflowctrl,
-        #     self.strflowctrl,
-        #     self.config.opti_thr_strflowctrl,
-        # )
-        # self.slidingco = tf.where(
-        #     self.strflowctrl <= self.config.opti_thr_strflowctrl,
-        #     0,
-        #     self.strflowctrl - self.config.opti_thr_strflowctrl,
-        # )
         self.velsurf_mag = self.getmag(self.uvelsurf, self.vvelsurf)
 
         self.icemask = tf.where(
