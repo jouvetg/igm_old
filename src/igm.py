@@ -2636,6 +2636,24 @@ class Igm:
             indices,
             indexing="ij",
         )[0, :, 0]
+         
+        # NEW CODE -----------------------------
+        zeta = self.rhs_to_zeta(self.rhpos) # get the position in the column
+        I0   = tf.cast(tf.math.floor(zeta*(self.config.Nz-1)),dtype='int32') 
+        I0   = tf.minimum(I0,self.config.Nz-2) # make sure to not reach the upper-most pt
+        I1   = I0+1
+        zeta0   = tf.cast( I0/(self.config.Nz-1) ,dtype='float32')
+        zeta1   = tf.cast( I1/(self.config.Nz-1) ,dtype='float32')
+       
+        lamb = (zeta-zeta0)/(zeta1-zeta0)
+        
+        ind0 = tf.transpose(tf.stack([I0,tf.range(I0.shape[0])])) 
+        ind1 = tf.transpose(tf.stack([I1,tf.range(I1.shape[0])]))
+        
+        wei = tf.zeros_like(u)
+        wei = tf.tensor_scatter_nd_add(wei, indices=ind0, updates=1-lamb)
+        wei = tf.tensor_scatter_nd_add(wei, indices=ind1, updates=lamb)
+        # NEW CODE -----------------------------
         
         if self.config.tracking_method=='simple':
 
@@ -2663,30 +2681,28 @@ class Igm:
             #     self.ypos = (self.ypos + self.dt * tf.gather_nd(v,ind))  # forward euler 
             #     self.zpos = ( topg + nthk * self.rhpos  )
             # OLD CODE -----------------------------
-  
-            zeta = self.rhs_to_zeta(self.rhpos) # get the position in the column
-            I0   = tf.cast(tf.math.floor(zeta*(self.config.Nz-1)),dtype='int32') 
-            I0   = tf.minimum(I0,self.config.Nz-2) # make sure to not reach the upper-most pt
-            I1   = I0+1
-            zeta0   = tf.cast( I0/(self.config.Nz-1) ,dtype='float32')
-            zeta1   = tf.cast( I1/(self.config.Nz-1) ,dtype='float32')
-           
-            lamb = (zeta-zeta0)/(zeta1-zeta0)
-            
-            ind0 = tf.transpose(tf.stack([I0,tf.range(I0.shape[0])])) 
-            ind1 = tf.transpose(tf.stack([I1,tf.range(I1.shape[0])]))
-            
-            wei = tf.zeros_like(u)
-            wei = tf.tensor_scatter_nd_add(wei, indices=ind0, updates=1-lamb)
-            wei = tf.tensor_scatter_nd_add(wei, indices=ind1, updates=lamb)
  
             self.xpos = (self.xpos + self.dt * tf.reduce_sum(wei*u,axis=0))  # forward euler
             self.ypos = (self.ypos + self.dt * tf.reduce_sum(wei*v,axis=0))  # forward euler 
             self.zpos = topg + nthk * self.rhpos
  
         elif self.config.tracking_method=='3d':
+             
+            print('NOT IMPLEMTEDN 3D, NEED TO DEFINE VERTICAL VELOCITY w ?????') 
+
+            # make sure the particle remian withi the ice body
+            self.zpos = ( tf.clip_by_value( self.zpos , topg, topg+othk) )
             
-            print('NOT IMPLEMTEDN 3D')
+            # get the relative height
+            self.rhpos = ( tf.where( othk > 0.1, (self.zpos - topg)/othk , 1 ) )
+               
+            self.xpos = (self.xpos + self.dt * tf.reduce_sum(wei*u,axis=0))  # forward euler
+            self.ypos = (self.ypos + self.dt * tf.reduce_sum(wei*v,axis=0))  # forward euler 
+            self.zpos = (self.zpos + self.dt * tf.reduce_sum(wei*w,axis=0))  # forward euler 
+            
+        # make sur the particle remains in the horiz. comp. domain
+        self.xpos = (tf.clip_by_value(self.xpos,self.x[0],self.x[-1]))
+        self.ypos = (tf.clip_by_value(self.ypos,self.y[0],self.y[-1]))
 
         indices = tf.concat(
             [
@@ -4642,7 +4658,7 @@ class Igm:
         sc = {}
         sc["thk"]       = 1
         sc["usurf"]     = 1
-        sc["slidingco"] = 1000
+        sc["slidingco"] = 10
         
         for f in self.config.opti_control:
             vars()[f] = tf.Variable(vars(self)[f]/sc[f])
@@ -4764,13 +4780,15 @@ class Igm:
                 else:
                     COST_HPO = tf.Variable(0.0)
 
-                # Make sur to keep reasonable values for slidingco
-                if "slidingco" in self.config.opti_control:
-                    COST_STR = 0.5 * tf.reduce_mean(
-                        ( (self.slidingco - self.config.opti_thr_slidingco) / self.config.opti_slidingco_std)**2
-                    )
-                else:
-                    COST_STR = tf.Variable(0.0)
+                # # Make sur to keep reasonable values for slidingco
+                # if "slidingco" in self.config.opti_control:
+                #     COST_STR = 0.5 * tf.reduce_mean(
+                #         ( (self.slidingco - self.config.opti_thr_slidingco) / self.config.opti_slidingco_std)**2
+                #     )
+                # else:
+                #     COST_STR = tf.Variable(0.0)
+                
+                COST_STR = tf.Variable(0.0)
 
                 # Here one adds a regularization terms for the ice thickness to the cost function
                 if "thk" in self.config.opti_control:
