@@ -264,7 +264,7 @@ class Igm:
         y = np.squeeze(nc.variables["y"]).astype("float32")
         
         # make sure the grid has same cell spacing in x and y
-        assert x[1] - x[0] == y[1] - y[0]
+        assert np.abs(x[1] - x[0]) == np.abs(y[1] - y[0])
 
         # load any field contained in the ncdf file, replace missing entries by nan
         for var in nc.variables:
@@ -1097,7 +1097,7 @@ class Igm:
         self.parser.add_argument(
             "--retrain_iceflow_emulator_framesizemax", 
             type=float, 
-            default=700, 
+            default=750, 
             help="retrain_iceflow_emulator_framesizemax",
         )        
         self.parser.add_argument(
@@ -1215,9 +1215,6 @@ class Igm:
                     + Exy ** 2 + Eyy ** 2 + Eyz ** 2 \
                     + Exz ** 2 + Eyz ** 2 + Ezz ** 2 ), DIV
 
-    def stag2(self,B):
-        return (B[:,1:] + B[:,:1])/2
-
     def stag4(self,B):
         return (B[:,1:,1:] + B[:,1:,:-1] + B[:,:-1,1:] + B[:,:-1,:-1])/4
  
@@ -1286,16 +1283,19 @@ class Igm:
             C_grav = 910 * 9.81 * 10**(-6) * tf.reduce_mean( tf.reduce_sum(dz * uds, axis=1) , axis=(-1,-2) )
             
         elif self.config.iceflow_physics==4:
-            # w = self.stag8(U[:, 2])
-            # w = tf.where( COND, w, 0.0)
-            slopsurfx, slopsurfy = self.compute_gradient(usurf, dX, dX)
-            slopsurfx = tf.expand_dims(slopsurfx,axis=1)
-            slopsurfy = tf.expand_dims(slopsurfy,axis=1)
-            w   = self.stag8(U[:,0])*slopsurfx + self.stag8(U[:,1])*slopsurfy
+            # THIS IS NOT WORKING YET            
+            w = self.stag8(U[:, 2])
+            w = tf.where( COND, w, 0.0)
             p   = self.stag8(U[:,3])
             p   = tf.where( COND, p, 0.0)
-            C_grav = 910 * 9.81 * 10**(-6) * tf.reduce_mean( tf.reduce_sum(dz * w,     axis=1) , axis=(-1,-2) ) \
-                                - 10**(-6) * tf.reduce_mean( tf.reduce_sum(dz * p*div, axis=1) , axis=(-1,-2) )
+            C_grav = 910 * 9.81 * 10**(-6) * tf.reduce_mean( tf.reduce_sum(dz * w,      axis=1) , axis=(-1,-2) ) \
+                                - 10**(-6) * tf.reduce_mean( tf.reduce_sum(dz * p*div , axis=1) , axis=(-1,-2) ) \
+                                + 10**(1)  * tf.reduce_mean( div**2 )
+            
+            # here one must add a penalization term form the imcompressibility condition            
+            # -> [CHECK AT "Theoretical and Numerical Issues of Incompressible Fluid Flows", Frey, slide 53 from the course Sorbonne Uni.]
+            # -> [CHECK AT eq. (2.45)- (2.48) of my PhD thesis ]
+            # -> [CHECK AT cme358_lecture_notes_3-2.pdf, eq. (3.18)]
             
         else:
             print('wrong iceflow_physics (must be 2 or 4)')
@@ -1418,7 +1418,7 @@ class Igm:
                     velsurf_mag = tf.sqrt(U[0,-1]**2+U[1,-1]**2)
                     T=velsurf_mag.shape[0]; i0=int(T/3) ; i1=int(2*T/3)
 #                    print('solve :',i,COST.numpy(),DDD.numpy(),np.max(velsurf_mag),np.max(velsurf_mag[i0:i1,i0:i1]))
-                    print('solve :',i,COST.numpy(),DDD.numpy(),np.max(velsurf_mag))
+                    print('solve :',i,COST.numpy(),np.max(velsurf_mag))
 
                     if self.config.plot_live:
                         # velmag = tf.norm( U[:,-1,:,:], axis=0 ) 
@@ -1726,7 +1726,9 @@ class Igm:
                 
                 self.COST_emulator = 0
                 
-                MISFIT = []
+                self.COST_EMUL_HISTORY = []
+                
+                self.L1_ERROR_HISTORY = []
                 
                 for i in range(X.shape[0]):
                 
@@ -1740,28 +1742,73 @@ class Igm:
                             
                             self.COST_emulator += COST.numpy()
                             
-                            MISFIT.append(self.COST_emulator)
+                            self.COST_EMUL_HISTORY.append(COST.numpy())
 
-                            if (epoch+1)%1000==0:
+                            if hasattr(self, "UT"):
+                                U = tf.Variable(self.Y_to_U(Y))
+                                l1,l2 = self.computemisfit(self.thk,U-self.UT)
+                                # l1 = self.computemisfitrel(self.thk,U,self.UT)
+                                self.L1_ERROR_HISTORY.append(l1)
+
+                            if (epoch+1)%100==0:
                                 
-                                print('Retrain : ', epoch, COST.numpy(), tf.norm(Y).numpy() )
-                             
-                            # if stop_if_no_decrease:
-                            #     if epoch>0:
-                            #         if MISFIT[-1]>=MISFIT[-2]:
-                            #             break
-                             
+                                U = self.Y_to_U(Y)
+                                # l1,l2 = self.computemisfit(self.thk,U-self.UT)
+                                velsurf_mag = tf.sqrt(U[0,-1]**2+U[1,-1]**2)
+                                print('train : ', epoch, COST.numpy(), np.max(velsurf_mag)) # ,l1,l2)
+  
                         grads = t.gradient(COST, self.iceflow_model.trainable_variables)
                         
                         self.opti_retrain.apply_gradients(zip(grads, self.iceflow_model.trainable_variables))
                         
-
+                        self.opti_retrain.lr = self.config.retrain_iceflow_emulator_lr * (0.95**(epoch/1000))
     
-                self.tlast_iceflow_emulator = self.t.numpy()
+#                self.tlast_iceflow_emulator = self.t.numpy()
         
                 self.tcomp["Retrain"][-1] -= time.time()
                 self.tcomp["Retrain"][-1] *= -1
-  
+                
+    def update_iceflow_diagnostic(self):
+        """
+              update_iceflow_diagnostic
+        """ 
+        
+        if not hasattr(self, "already_called_update_iceflow_diagnostic"):
+            
+            self.UT = tf.Variable(tf.zeros((self.config.iceflow_physics,
+                                            self.config.Nz, \
+                                            self.thk.shape[0], self.thk.shape[1])))
+                
+            self.already_called_update_iceflow_diagnostic = True
+        else:
+ 
+            self.tcomp["Iceflow Solv"].append(time.time())                            
+            UT, MISFIT = self.solve_iceflow(self.UT,stop_if_no_decrease=True)
+            self.UT.assign(UT)
+            
+            self.COST_Glen = MISFIT[-1].numpy()
+            if self.it%100==0:
+                  print('nb solve iterations :',len(MISFIT))
+            self.tcomp["Iceflow Solv"][-1] -= time.time()
+            self.tcomp["Iceflow Solv"][-1] *= -1
+      
+            self.update_iceflow_emulator()
+            self.update_iceflow_emulated()
+     
+            l1,l2 = self.computemisfit(self.thk,self.U-self.UT)   
+#            l1 = self.computemisfitrel(self.thk,self.U,self.UT)   
+ 
+            if self.it%100==0:
+                  ERR = [self.t.numpy(), self.COST_Glen, self.COST_emulator, l1, l2]
+                  print(ERR)
+            
+            if self.it%10==0:
+            
+                 ERR = [self.t.numpy(), self.COST_Glen, self.COST_emulator, l1, l2] 
+                
+                 with open(os.path.join(self.config.working_dir, 'errors.txt'), "ab") as f:
+                      np.savetxt(f, np.expand_dims(ERR,axis=0), delimiter=',', fmt="%5.5f")
+ 
     def save_iceflow_model(self):
         
         directory =  os.path.join(self.config.working_dir, "iceflow-model")
@@ -1785,13 +1832,30 @@ class Igm:
         
     def computemisfit(self,thk,U):
           
-        VEL = tf.stack([ tf.reduce_sum( self.vert_weight*U[0] , axis=0)  , \
-                         tf.reduce_sum( self.vert_weight*U[1] , axis=0) ], axis=0) 
+        # VEL = tf.stack([ tf.reduce_sum( self.vert_weight*U[0] , axis=0)  , \
+        #                  tf.reduce_sum( self.vert_weight*U[1] , axis=0) ], axis=0) 
  
-        nl1diff = tf.reduce_sum(tf.where(thk>1,tf.abs(VEL),0)) / (2*np.sum(thk>1)) 
-
-        return nl1diff.numpy()
-
+        # nl1diff = tf.reduce_sum(tf.where(thk>1,tf.abs(VEL),0)) / (2*np.sum(thk>1)) 
+        
+        ubar = tf.reduce_sum( self.vert_weight*U[0] , axis=0)
+        vbar = tf.reduce_sum( self.vert_weight*U[1] , axis=0)         
+        
+        VEL  = tf.stack([ubar, vbar], axis=0)         
+        MA   = tf.where(self.thk>1,tf.ones_like(VEL),0)
+        
+        nl1diff = tf.reduce_sum(MA*tf.abs(VEL))    / tf.reduce_sum(MA)
+        nl2diff = tf.reduce_sum(MA*tf.abs(VEL)**2) / tf.reduce_sum(MA)
+ 
+        return nl1diff.numpy(),np.sqrt(nl2diff)
+    
+    # def computemisfitrel(self,thk,U,UT):
+ 
+    #     A = tf.reduce_sum(tf.where(thk>1,tf.abs(U-UT),0))
+     
+    #     B = tf.reduce_sum(tf.where(thk>1,tf.abs(UT),0))
+ 
+    #     return (A/B).numpy()
+ 
     ####################################################################################
     ####################################################################################
     ####################################################################################
@@ -2286,6 +2350,7 @@ class Igm:
         self.nzpos  = self.usurf[I]
         self.nrhpos = tf.ones_like(self.X[I])
         self.nwpos  = tf.ones_like(self.X[I])
+        self.ntpos  = tf.ones_like(self.X[I])*self.t
         
     def update_particles(self):
         
@@ -2335,6 +2400,7 @@ class Igm:
             self.zpos = tf.Variable([])
             self.rhpos = tf.Variable([])
             self.wpos = tf.Variable([]) # this is to give a weight to the particle
+            self.tpos = tf.Variable([]) # this is to give a weight to the particle
 
             # build the gridseed
             self.gridseed = np.zeros_like(self.thk) == 1
@@ -2358,6 +2424,7 @@ class Igm:
             self.zpos = tf.Variable(tf.concat([self.zpos, self.nzpos], axis=-1))
             self.rhpos = tf.Variable(tf.concat([self.rhpos, self.nrhpos], axis=-1))
             self.wpos = tf.Variable(tf.concat([self.wpos, self.nwpos], axis=-1))
+            self.tpos = tf.Variable(tf.concat([self.tpos, self.ntpos], axis=-1))
 
             self.tlast_seeding = self.t.numpy() 
 
@@ -2636,8 +2703,7 @@ class Igm:
             indices,
             indexing="ij",
         )[0, :, 0]
-         
-        # NEW CODE -----------------------------
+          
         zeta = self.rhs_to_zeta(self.rhpos) # get the position in the column
         I0   = tf.cast(tf.math.floor(zeta*(self.config.Nz-1)),dtype='int32') 
         I0   = tf.minimum(I0,self.config.Nz-2) # make sure to not reach the upper-most pt
@@ -2652,8 +2718,7 @@ class Igm:
         
         wei = tf.zeros_like(u)
         wei = tf.tensor_scatter_nd_add(wei, indices=ind0, updates=1-lamb)
-        wei = tf.tensor_scatter_nd_add(wei, indices=ind1, updates=lamb)
-        # NEW CODE -----------------------------
+        wei = tf.tensor_scatter_nd_add(wei, indices=ind1, updates=lamb) 
         
         if self.config.tracking_method=='simple':
 
@@ -2665,41 +2730,68 @@ class Igm:
                     nthk > 0.1, tf.clip_by_value(self.rhpos * othk / nthk, 0, 1), 1
                 )
             )
-             
-            # OLD CODE -----------------------------
-            # the 2 following line inverse the following relation to find I from rhs
-            # weight  = ((zeta / self.config.vert_spacing) * (1.0 + (self.config.vert_spacing - 1.0) * zeta))
-            
-            # DET = tf.sqrt(1+4*(self.config.vert_spacing-1)*self.config.vert_spacing*self.rhpos)
-            # temp = self.config.Nz*(DET.numpy()-1)/(2*(self.config.vert_spacing-1))
-            # I = np.minimum(temp.astype(int),self.config.Nz-1)           
-            # ind = [[j,i] for i,j in enumerate(I)]
-            
-            # if len(I)>0:
-                
-            #     self.xpos = (self.xpos + self.dt * tf.gather_nd(u,ind))  # forward euler
-            #     self.ypos = (self.ypos + self.dt * tf.gather_nd(v,ind))  # forward euler 
-            #     self.zpos = ( topg + nthk * self.rhpos  )
-            # OLD CODE -----------------------------
  
             self.xpos = (self.xpos + self.dt * tf.reduce_sum(wei*u,axis=0))  # forward euler
             self.ypos = (self.ypos + self.dt * tf.reduce_sum(wei*v,axis=0))  # forward euler 
             self.zpos = topg + nthk * self.rhpos
- 
-        elif self.config.tracking_method=='3d':
-             
-            print('NOT IMPLEMTEDN 3D, NEED TO DEFINE VERTICAL VELOCITY w ?????') 
 
+        elif self.config.tracking_method=='3d':
+
+            method = 0
+            
             # make sure the particle remian withi the ice body
             self.zpos = ( tf.clip_by_value( self.zpos , topg, topg+othk) )
             
             # get the relative height
             self.rhpos = ( tf.where( othk > 0.1, (self.zpos - topg)/othk , 1 ) )
-               
+            
+            if method == 0:
+                
+                # This is the former working methd
+            
+                slopsurfx, slopsurfy = self.compute_gradient_tf(self.usurf, self.dx, self.dx)
+                sloptopgx, sloptopgy = self.compute_gradient_tf(self.topg, self.dx, self.dx)
+        
+                self.divflux = self.compute_divflux(self.ubar, self.vbar, self.thk, self.dx, self.dx)
+         
+                # the vertical velocity is the scalar product of horizont. velo and bedrock gradient
+                self.wvelbase =  self.U[0,0] * sloptopgx + self.U[1,0] * sloptopgy
+                # Using rules of derivative the surface vertical velocity can be found from the
+                # divergence of the flux considering that the ice 3d velocity is divergence-free.
+                self.wvelsurf =  self.U[0,-1] * slopsurfx + self.U[1,-1] * slopsurfy - self.divflux 
+                 
+                wvelbase = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.wvelbase, axis=0), axis=-1),
+                    indices,
+                    indexing="ij",
+                )[0, :, 0]
+                
+                wvelsurf = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(tf.expand_dims(self.wvelsurf, axis=0), axis=-1),
+                    indices,
+                    indexing="ij",
+                )[0, :, 0]
+                
+                wvel = wvelbase + (wvelsurf - wvelbase) * ( 1 - (1 - self.rhpos) ** 4)  # SIA-like
+                
+            else:
+                
+                # This is the new attemps not working yet :-(
+                
+                self.W = self.compute_vertical_velocity_tf(self.U, self.thk, self.dX)
+                
+                w = tfa.image.interpolate_bilinear(
+                    tf.expand_dims(self.W, axis=-1),
+                    indices,
+                    indexing="ij",
+                )[:, :, 0]
+              
+                wvel = tf.reduce_sum(wei*w,axis=0)
+                   
             self.xpos = (self.xpos + self.dt * tf.reduce_sum(wei*u,axis=0))  # forward euler
             self.ypos = (self.ypos + self.dt * tf.reduce_sum(wei*v,axis=0))  # forward euler 
-            self.zpos = (self.zpos + self.dt * tf.reduce_sum(wei*w,axis=0))  # forward euler 
-            
+            self.zpos = (self.zpos + self.dt * wvel)  # forward euler 
+ 
         # make sur the particle remains in the horiz. comp. domain
         self.xpos = (tf.clip_by_value(self.xpos,self.x[0],self.x[-1]))
         self.ypos = (tf.clip_by_value(self.ypos,self.y[0],self.y[-1]))
@@ -2720,6 +2812,49 @@ class Igm:
 
         self.tcomp["Tracking"][-1] -= time.time()
         self.tcomp["Tracking"][-1] *= -1
+        
+    @tf.function(experimental_relax_shapes=True)
+    def compute_vertical_velocity_tf(self, U, thk, dX):
+        """
+        Compute the vertical component of the velocity 
+        by integrating the imcompressibility condition
+        """
+ 
+        # Compute horinzontal derivatives
+        dUdx = (U[0,:, :, 2:] - U[0,:, :, :-2]) / (2*dX[0,0])
+        dVdy = (U[1,:, 2:, :] - U[1,:, :-2, :]) / (2*dX[0,0])
+ 
+        dUdx = tf.pad(dUdx, [[0, 0],[0, 0],[1, 1]], "CONSTANT")
+        dVdy = tf.pad(dVdy, [[0, 0],[1, 1],[0, 0]], "CONSTANT")
+ 
+        dUdx = (dUdx[1:] + dUdx[:-1])/2  # compute between the layers
+        dVdy = (dVdy[1:] + dVdy[:-1])/2  # compute between the layers
+        
+        # get dVdz from impcrompressibility condition
+        dVdz = - dUdx - dVdy
+        
+        # get the basal vertical velocities
+        sloptopgx, sloptopgy = self.compute_gradient_tf(self.topg, self.dx, self.dx)
+        wvelbase =  self.U[0,0] * sloptopgx + self.U[1,0] * sloptopgy
+ 
+        # get the vertical thickness layers 
+        zeta    = np.arange(self.config.Nz) / (self.config.Nz-1)
+        temp    = ((zeta / self.config.vert_spacing) * (1.0 + (self.config.vert_spacing - 1.0) * zeta))
+        temd    = temp[1:] - temp[:-1]
+        dz      = tf.stack([self.thk*z for z in temd],axis=0)  
+ 
+        W = []
+        W.append(wvelbase)
+        for l in range(dVdz.shape[0]):
+            W.append(W[-1]+dVdz[l]*dz[l])
+        W = tf.stack(W)
+  
+        return W
+        
+        # WW = tf.concat( [ tf.expand_dims( wvelbase ,axis=0) ,  dVdz*dz ], axis=0)
+    
+        # # integrate
+        # return tf.cumsum(WW,axis=0)
             
     def update_write_trajectories(self):
 
@@ -2734,8 +2869,8 @@ class Igm:
             f = os.path.join(self.config.working_dir, "trajectories", 'traj-'+'{:06d}'.format(int(self.t.numpy()))+'.csv') 
             ft = os.path.join(self.config.working_dir, "trajectories", 'time.dat') 
             ID = tf.cast(tf.range(self.xpos.shape[0]),dtype='float32')
-            array = tf.transpose(tf.stack([ID,self.xpos,self.ypos,self.zpos,self.rhpos],axis=0))
-            np.savetxt(f, array , delimiter=',', fmt="%.2f", header='Id,x,y,z,rh')
+            array = tf.transpose(tf.stack([ID,self.xpos,self.ypos,self.zpos,self.rhpos,self.tpos],axis=0))
+            np.savetxt(f, array , delimiter=',', fmt="%.2f", header='Id,x,y,z,rh,t')
             with open(ft, "a") as f:
                 print(self.t.numpy(), file=f )  
                 
@@ -2814,6 +2949,8 @@ class Igm:
                                                        sigma=self.config.smoothing_thk_sigma, 
                                                        filter_shape=self.config.smoothing_thk_filter_shape,
                                                        padding="CONSTANT") )
+                
+                self.usurf = self.thk + self.topg
                 
                 self.tlast_smoothing_thk = self.t.numpy()
 
@@ -4697,9 +4834,12 @@ class Igm:
                 self.uvelsurf = Y[0, :Ny, :Nx, N-1]   
                 self.vvelsurf = Y[0, :Ny, :Nx, 2*N-1]   
                 
+                # TODO UPDATE : SWITHC TO THE OTHER
                 self.ubar = tf.reduce_mean(Y[0, :Ny, :Nx, :N],axis=-1)  
+                # self.ubar = tf.reduce_sum(Y[0, :Ny, :Nx, :N]*self.vert_weight, axis=-1)
                 self.vbar = tf.reduce_mean(Y[0, :Ny, :Nx, N:],axis=-1)  
-                  
+                #self.vbar = tf.reduce_sum(Y[0, :Ny, :Nx, N:]*self.vert_weight, axis=-1)  
+                
                 self.velsurf = tf.stack([self.uvelsurf, self.vvelsurf], axis=-1)  # NOT normalized vars
 
                 # misfit between surface velocity
@@ -5324,7 +5464,7 @@ class Igm:
                 self.ax = self.fig.add_subplot(1, 1, 1)
                 self.ax.axis("off")
                 im = self.ax.imshow(
-                    tf.where(self.thk>1,vars(self)[self.config.varplot],np.nan),
+                    vars(self)[self.config.varplot],
                     origin="lower",
                     cmap="viridis",
                     vmin=0,
@@ -5346,7 +5486,7 @@ class Igm:
 #                self.ax.set_ylim(5142250,5147050)
             else:
                 im = self.ax.imshow(
-                    tf.where(self.thk>1,vars(self)[self.config.varplot],np.nan),
+                    vars(self)[self.config.varplot],
                     origin="lower",
                     cmap="viridis",
                     vmin=0,
