@@ -2351,6 +2351,7 @@ class Igm:
         self.nrhpos = tf.ones_like(self.X[I])
         self.nwpos  = tf.ones_like(self.X[I])
         self.ntpos  = tf.ones_like(self.X[I])*self.t
+        self.nenglt  = tf.zeros_like(self.X[I])
         
     def update_particles(self):
         
@@ -2400,7 +2401,8 @@ class Igm:
             self.zpos = tf.Variable([])
             self.rhpos = tf.Variable([])
             self.wpos = tf.Variable([]) # this is to give a weight to the particle
-            self.tpos = tf.Variable([]) # this is to give a weight to the particle
+            self.tpos = tf.Variable([])
+            self.englt = tf.Variable([])
 
             # build the gridseed
             self.gridseed = np.zeros_like(self.thk) == 1
@@ -2425,6 +2427,7 @@ class Igm:
             self.rhpos = tf.Variable(tf.concat([self.rhpos, self.nrhpos], axis=-1))
             self.wpos = tf.Variable(tf.concat([self.wpos, self.nwpos], axis=-1))
             self.tpos = tf.Variable(tf.concat([self.tpos, self.ntpos], axis=-1))
+            self.englt = tf.Variable(tf.concat([self.englt, self.nenglt], axis=-1))
 
             self.tlast_seeding = self.t.numpy() 
 
@@ -2572,6 +2575,8 @@ class Igm:
         self.weight_particles = tf.tensor_scatter_nd_add(
             tf.zeros_like(self.thk), indices, updates
         )
+        
+        self.englt = self.englt + tf.cast(tf.where(self.rhpos<1,self.dt,0.0),dtype='float32')
 
         self.tcomp["Tracking"][-1] -= time.time()
         self.tcomp["Tracking"][-1] *= -1
@@ -2869,8 +2874,8 @@ class Igm:
             f = os.path.join(self.config.working_dir, "trajectories", 'traj-'+'{:06d}'.format(int(self.t.numpy()))+'.csv') 
             ft = os.path.join(self.config.working_dir, "trajectories", 'time.dat') 
             ID = tf.cast(tf.range(self.xpos.shape[0]),dtype='float32')
-            array = tf.transpose(tf.stack([ID,self.xpos,self.ypos,self.zpos,self.rhpos,self.tpos],axis=0))
-            np.savetxt(f, array , delimiter=',', fmt="%.2f", header='Id,x,y,z,rh,t')
+            array = tf.transpose(tf.stack([ID,self.xpos,self.ypos,self.zpos,self.rhpos,self.tpos,self.englt],axis=0))
+            np.savetxt(f, array , delimiter=',', fmt="%.2f", header='Id,x,y,z,rh,t,englt')
             with open(ft, "a") as f:
                 print(self.t.numpy(), file=f )  
                 
@@ -4436,7 +4441,7 @@ class Igm:
 
             ax = fig.add_subplot(2, 3, 1)
             extent = [self.x[0], self.x[-1], self.y[0], self.y[-1]]
-            im1 = ax.imshow(self.thk, origin="lower", extent=extent, vmin=0, vmax=1400)
+            im1 = ax.imshow(self.thk, origin="lower", extent=extent, vmin=0, vmax=800)
             plt.colorbar(im1)
 
             if hasattr(self, "profile"):
@@ -4468,7 +4473,7 @@ class Igm:
             ax = fig.add_subplot(2, 3, 2)
             velsurf_mag = self.getmag(self.uvelsurf, self.vvelsurf).numpy()
             im1 = ax.imshow(
-                velsurf_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)/4
+                velsurf_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)
             )
             plt.colorbar(im1, format="%.2f")
             ax.set_title(
@@ -4508,7 +4513,7 @@ class Igm:
 
             ax = fig.add_subplot(2, 3, 5)
             im1 = ax.imshow(
-                velsurfobs_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)/4
+                velsurfobs_mag, origin="lower", vmin=0, vmax=np.nanmax(velsurfobs_mag)
             )
             plt.colorbar(im1, format="%.2f")
             ax.set_title("OBS VEL (TARGET)", size=15)
